@@ -50,6 +50,11 @@ func (r *ShipmentCloseReport) Render(data *ShipmentCloseReportData) (*ReportData
 	createStr := data.TimeCreate.Format("15:04")
 	closeStr := data.TimeClose.Format("15:04")
 
+	r.data.Header = &Item{
+		Children: []*Item{
+			{Text: time.Now().Format("2006.01.02 15:04:05 -07"), Quote: true},
+		},
+	}
 	r.data.Body = &Item{
 		Children: []*Item{
 			{Text: "Маршрут:", Bold: true, Block: true}, {Text: strconv.Itoa(data.RouteID)},

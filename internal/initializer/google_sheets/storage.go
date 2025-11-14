@@ -2,15 +2,16 @@ package google_sheets
 
 import (
 	"encoding/json"
-	"golang.org/x/oauth2"
 	"os"
-	models2 "wb_logistic_assistant/external/google_sheets_api/models"
+	google_models "wb_logistic_assistant/external/google_sheets_api/models"
 	"wb_logistic_assistant/internal/errors"
 	"wb_logistic_assistant/internal/logger"
 	"wb_logistic_assistant/internal/models"
+
+	"golang.org/x/oauth2"
 )
 
-func (i *Initializer) GetOAuthCredentialsFile() (*models2.OAuthCredentials, error) {
+func (i *Initializer) GetOAuthCredentialsFile() (*google_models.OAuthCredentials, error) {
 	logger.Log(logger.INFO, "Initializer.GetOAuthCredentialsFile()", "start getting oauth credentials from file")
 
 	path := i.config.GoogleSheets().Client().OAuthCredentials()
@@ -23,7 +24,7 @@ func (i *Initializer) GetOAuthCredentialsFile() (*models2.OAuthCredentials, erro
 		return nil, errors.Wrapf(err, "Initializer.GetOAuthCredentialsFile()", "failed to read oauth credentials from file %s", path)
 	}
 
-	credentials := &models2.OAuthCredentials{}
+	credentials := &google_models.OAuthCredentials{}
 	err = json.Unmarshal(credentialsData, credentials)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Initializer.GetOAuthCredentialsFile()", "failed to decode oauth credentials from file %s", path)
@@ -32,7 +33,7 @@ func (i *Initializer) GetOAuthCredentialsFile() (*models2.OAuthCredentials, erro
 	return credentials, nil
 }
 
-func (i *Initializer) GetServiceCredentialsFile() (*models2.ServiceCredentials, error) {
+func (i *Initializer) GetServiceCredentialsFile() (*google_models.ServiceCredentials, error) {
 	logger.Log(logger.INFO, "Initializer.GetServiceCredentialsFile()", "start getting service credentials from file")
 
 	path := i.config.GoogleSheets().Client().ServiceCredentials()
@@ -45,7 +46,7 @@ func (i *Initializer) GetServiceCredentialsFile() (*models2.ServiceCredentials, 
 		return nil, errors.Wrapf(err, "Initializer.GetServiceCredentialsFile()", "failed to read service credentials from file %s", path)
 	}
 
-	credentials := &models2.ServiceCredentials{}
+	credentials := &google_models.ServiceCredentials{}
 	err = json.Unmarshal(credentialsData, credentials)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Initializer.GetServiceCredentialsFile()", "failed to decode service credentials from file %s", path)
@@ -54,13 +55,13 @@ func (i *Initializer) GetServiceCredentialsFile() (*models2.ServiceCredentials, 
 	return credentials, nil
 }
 
-func (i *Initializer) GetOAuthTokenStorage() (*models2.OAuthToken, error) {
+func (i *Initializer) GetOAuthTokenStorage() (*google_models.OAuthToken, error) {
 	tokenStorage := i.storage.ConfigStore().GetGoogleSheetsOAuthTokenModel()
 	if tokenStorage == nil {
 		return nil, errors.New("Initializer.GetOAuthTokenStorage()", "oauth token are missing from storage")
 	}
 
-	token := &models2.OAuthToken{
+	token := &google_models.OAuthToken{
 		TokenType:    tokenStorage.TokenType(),
 		AccessToken:  tokenStorage.AccessToken(),
 		RefreshToken: tokenStorage.RefreshToken(),
@@ -94,13 +95,13 @@ func (i *Initializer) SetOAuthTokenStorage(token *oauth2.Token) error {
 	return nil
 }
 
-func (i *Initializer) GetOAuthCredentialsStorage() (*models2.OAuthCredentials, error) {
+func (i *Initializer) GetOAuthCredentialsStorage() (*google_models.OAuthCredentials, error) {
 	credentialsModel := i.storage.ConfigStore().GetGoogleSheetsOAuthCredentials()
 	if credentialsModel == nil {
 		return nil, errors.New("Initializer.GetOAuthCredentialsStorage()", "oauth credentials are missing from storage")
 	}
 
-	credentials := &models2.OAuthCredentials{}
+	credentials := &google_models.OAuthCredentials{}
 	credentials.Installed.ProjectID = credentialsModel.ProjectID()
 	credentials.Installed.ClientID = credentialsModel.ClientID()
 	credentials.Installed.ClientSecret = credentialsModel.ClientSecret()
@@ -116,7 +117,7 @@ func (i *Initializer) GetOAuthCredentialsStorage() (*models2.OAuthCredentials, e
 	return credentials, nil
 }
 
-func (i *Initializer) SetOAuthCredentialsStorage(credentials *models2.OAuthCredentials) error {
+func (i *Initializer) SetOAuthCredentialsStorage(credentials *google_models.OAuthCredentials) error {
 	if credentials == nil {
 		return errors.New("Initializer.SetOAuthCredentialsStorage()", "invalid oauth credentials provided")
 	}
@@ -137,13 +138,13 @@ func (i *Initializer) SetOAuthCredentialsStorage(credentials *models2.OAuthCrede
 	return nil
 }
 
-func (i *Initializer) GetServiceCredentialsStorage() (*models2.ServiceCredentials, error) {
+func (i *Initializer) GetServiceCredentialsStorage() (*google_models.ServiceCredentials, error) {
 	credentialsModel := i.storage.ConfigStore().GetGoogleSheetsServiceCredentials()
 	if credentialsModel == nil {
 		return nil, errors.New("Initializer.GetServiceCredentialsStorage()", "service credentials are missing from storage")
 	}
 
-	credentials := &models2.ServiceCredentials{}
+	credentials := &google_models.ServiceCredentials{}
 	credentials.Type = credentialsModel.Type()
 	credentials.ProjectID = credentialsModel.ProjectID()
 	credentials.PrivateKeyID = credentialsModel.PrivateKeyID()
@@ -163,7 +164,7 @@ func (i *Initializer) GetServiceCredentialsStorage() (*models2.ServiceCredential
 	return credentials, nil
 }
 
-func (i *Initializer) SetServiceCredentialsStorage(credentials *models2.ServiceCredentials) error {
+func (i *Initializer) SetServiceCredentialsStorage(credentials *google_models.ServiceCredentials) error {
 	if credentials == nil {
 		return errors.New("Initializer.SetServiceCredentialsStorage()", "invalid service credentials provided")
 	}

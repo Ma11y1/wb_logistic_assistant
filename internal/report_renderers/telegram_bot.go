@@ -45,6 +45,8 @@ func (r *TelegramBotRenderer) Render(data *reports.ReportData) ([]string, error)
 	if data.Header != nil {
 		if err := r.render(data.Header); err != nil {
 			return nil, err
+		} else {
+			r.write("\n", true)
 		}
 	}
 	if data.Body != nil {

@@ -3,6 +3,7 @@ package initializer
 import (
 	"wb_logistic_assistant/internal/config"
 	"wb_logistic_assistant/internal/errors"
+	"wb_logistic_assistant/internal/initializer/google_sheets"
 	"wb_logistic_assistant/internal/initializer/telegram_bot"
 	"wb_logistic_assistant/internal/initializer/wb_logistic"
 	"wb_logistic_assistant/internal/logger"
@@ -40,17 +41,17 @@ func (i *Initializer) Init() (*AppDependencies, error) {
 	servicesContainer := &services.Container{}
 	servicesTTL := i.config.Logistic().CacheTTL()
 
-	//googleSheetsInitializer := google_sheets.NewInitializer(i.config, i.storage, i.prompter)
-	//googleSheetsClient, googleSheetsActor, err := googleSheetsInitializer.Init()
-	//if err != nil {
-	//	return nil, errors.Wrap(err, "Initializer.Init()", "Failed to init Google Sheets client")
-	//}
-	//servicesContainer.GoogleSheetsService = services.NewBaseGoogleSheetsService(googleSheetsClient, googleSheetsActor)
-	//
-	//err = i.updateStorage()
-	//if err != nil {
-	//	return nil, err
-	//}
+	googleSheetsInitializer := google_sheets.NewInitializer(i.config, i.storage, i.prompter)
+	googleSheetsClient, googleSheetsActor, err := googleSheetsInitializer.Init()
+	if err != nil {
+		return nil, errors.Wrap(err, "Initializer.Init()", "Failed to init Google Sheets client")
+	}
+	servicesContainer.GoogleSheetsService = services.NewBaseGoogleSheetsService(googleSheetsClient, googleSheetsActor)
+
+	err = i.updateStorage()
+	if err != nil {
+		return nil, err
+	}
 
 	wbLogisticInitializer := wb_logistic.NewInitializer(i.config, i.storage, i.prompter)
 	wbLogisticClient, wbLogisticSession, err := wbLogisticInitializer.Init()

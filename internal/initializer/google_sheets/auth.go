@@ -2,13 +2,14 @@ package google_sheets
 
 import (
 	"context"
-	"golang.org/x/oauth2"
 	"time"
-	auth2 "wb_logistic_assistant/external/google_sheets_api/auth"
+	"wb_logistic_assistant/external/google_sheets_api/auth"
 	google_sheets_models "wb_logistic_assistant/external/google_sheets_api/models"
 	"wb_logistic_assistant/internal/errors"
 	"wb_logistic_assistant/internal/logger"
 	"wb_logistic_assistant/internal/utils"
+
+	"golang.org/x/oauth2"
 )
 
 const (
@@ -17,7 +18,7 @@ const (
 	maxAuthAttempts = 3
 )
 
-func (i *Initializer) authOAuthSession() (*auth2.OAuthActor, error) {
+func (i *Initializer) authOAuthSession() (*auth.OAuthActor, error) {
 	logger.Log(logger.INFO, "Initializer.authOAuthSession()", "start auth google sheets oauth session")
 
 	if !i.prompter.PromptGoogleSheetsQuestionAuthNewCredentials() {
@@ -66,7 +67,7 @@ func (i *Initializer) authOAuthSession() (*auth2.OAuthActor, error) {
 	return actor, nil
 }
 
-func (i *Initializer) authOAuthSessionStorage() (*auth2.OAuthActor, error) {
+func (i *Initializer) authOAuthSessionStorage() (*auth.OAuthActor, error) {
 	logger.Log(logger.INFO, "Initializer.authOAuthSessionStorage()", "start auth google sheets oauth session using storage")
 
 	credentials, err := i.GetOAuthCredentialsStorage()
@@ -79,14 +80,14 @@ func (i *Initializer) authOAuthSessionStorage() (*auth2.OAuthActor, error) {
 		logger.Log(logger.WARN, "Initializer.authOAuthSessionStorage()", "failed to get google sheets oauth access token from storage")
 	}
 
-	actor := &auth2.OAuthActor{}
+	actor := &auth.OAuthActor{}
 	if token != nil {
 		err = actor.AuthTokenSource(
 			context.Background(),
 			token,
 			credentials,
-			auth2.SheetsAllScope,
-			&auth2.TokenSource{
+			auth.SheetsAllScope,
+			&auth.TokenSource{
 				ErrorHandler:        i.errorRefreshOAuthTokenHandler,
 				RefreshTokenHandler: i.refreshOAuthTokenHandler,
 			},
@@ -121,21 +122,21 @@ func (i *Initializer) authOAuthSessionStorage() (*auth2.OAuthActor, error) {
 	return actor, nil
 }
 
-func (i *Initializer) authOAuthSessionAuto(credentials *google_sheets_models.OAuthCredentials) (*auth2.OAuthActor, error) {
+func (i *Initializer) authOAuthSessionAuto(credentials *google_sheets_models.OAuthCredentials) (*auth.OAuthActor, error) {
 	logger.Log(logger.INFO, "Initializer.authOAuthSessionAuto()", "start auto auth google sheets oauth session")
-	actor := &auth2.OAuthActor{}
+	actor := &auth.OAuthActor{}
 
-	authorizer := auth2.NewOAuthAuthorizer(serverAddr, callbackPath)
+	authorizer := auth.NewOAuthAuthorizer(serverAddr, callbackPath)
 	defer authorizer.Stop()
 
-	authorizerNotifications := auth2.NewOAuthNotifications()
+	authorizerNotifications := auth.NewOAuthNotifications()
 	authorizerNotifications.Successful = "Авторизация прошла успешно! Можно закрывать данную вкладку."
 	err := authorizer.SetOAuthNotifications(authorizerNotifications)
 	if err != nil {
 		return nil, errors.Wrap(err, "Initializer.authOAuthSessionAuto()", "failed to set oauth authorizer notifications")
 	}
 
-	url, err := authorizer.Start(actor, credentials, auth2.SheetsAllScope)
+	url, err := authorizer.Start(actor, credentials, auth.SheetsAllScope)
 	if err != nil {
 		return nil, errors.Wrap(err, "Initializer.authOAuthSessionAuto()", "failed to start oauth authorizer")
 	}
@@ -158,12 +159,12 @@ func (i *Initializer) authOAuthSessionAuto(credentials *google_sheets_models.OAu
 	return result.Actor, nil
 }
 
-func (i *Initializer) authOAuthSessionManual(credentials *google_sheets_models.OAuthCredentials) (*auth2.OAuthActor, error) {
+func (i *Initializer) authOAuthSessionManual(credentials *google_sheets_models.OAuthCredentials) (*auth.OAuthActor, error) {
 	logger.Log(logger.INFO, "Initializer.authOAuthSessionManual()", "start manual auth google sheets oauth session")
 
-	actor := &auth2.OAuthActor{}
+	actor := &auth.OAuthActor{}
 
-	url, err := actor.AuthCodeURL(credentials, auth2.SheetsAllScope, auth2.GenerateState())
+	url, err := actor.AuthCodeURL(credentials, auth.SheetsAllScope, auth.GenerateState())
 	if err != nil {
 		return nil, errors.Wrap(err, "Initializer.authOAuthSessionManual()", "failed to get auth code url")
 	}
@@ -179,7 +180,7 @@ func (i *Initializer) authOAuthSessionManual(credentials *google_sheets_models.O
 		i.prompter.PromptGoogleSheetsInvalidAuthCode()
 	}
 
-	err = actor.ExchangeCodeTokenSource(context.Background(), code, &auth2.TokenSource{
+	err = actor.ExchangeCodeTokenSource(context.Background(), code, &auth.TokenSource{
 		ErrorHandler:        i.errorRefreshOAuthTokenHandler,
 		RefreshTokenHandler: i.refreshOAuthTokenHandler,
 	})
@@ -190,7 +191,7 @@ func (i *Initializer) authOAuthSessionManual(credentials *google_sheets_models.O
 	return actor, nil
 }
 
-func (i *Initializer) authServiceSession() (*auth2.ServiceActor, error) {
+func (i *Initializer) authServiceSession() (*auth.ServiceActor, error) {
 	logger.Log(logger.INFO, "Initializer.authServiceSession()", "start auth service session Google Sheets")
 
 	var credentials *google_sheets_models.ServiceCredentials
@@ -217,8 +218,8 @@ func (i *Initializer) authServiceSession() (*auth2.ServiceActor, error) {
 		}
 	}
 
-	service := &auth2.ServiceActor{}
-	err = service.Auth(context.Background(), credentials, auth2.SheetsAllScope)
+	service := &auth.ServiceActor{}
+	err = service.Auth(context.Background(), credentials, auth.SheetsAllScope)
 	if err != nil {
 		return nil, errors.Wrap(err, "Initializer.authServiceSession()", "failed to auth service actor")
 	}
