@@ -57,7 +57,7 @@ func NewGeneralRoutesReport() *GeneralRoutesReport {
 		indexRemainsBarcodes:      10,
 		indexWaySheetID:           11,
 	}
-	r.data.Title = "General routes report"
+
 	//r.data.Header[1] = []Item{
 	//	{Text: "Маршрут", Bold: true},
 	//	{Text: "Парковка", Bold: true},

@@ -83,7 +83,7 @@ func NewShipmentCloseReporter(config *config.Config, storage storage.Storage, se
 		services:                             service,
 		report:                               reports.NewShipmentCloseReport(),
 		rendererGS:                           &report_renderers.GoogleSheetsRenderer{},
-		rendererTG:                           &report_renderers.TelegramBotRenderer{Mode: report_renderers.TelegramBotRenderHTML, IsTitle: false},
+		rendererTG:                           &report_renderers.TelegramBotRenderer{Mode: report_renderers.TelegramBotRenderHTML},
 		renderModeTG:                         report_renderers.TelegramBotRenderHTML,
 		isRenderGS:                           config.Reports().ShipmentClose().IsRenderGoogleSheets(),
 		isRenderTG:                           config.Reports().ShipmentClose().IsRenderTelegramBot(),
@@ -111,128 +111,6 @@ func NewShipmentCloseReporter(config *config.Config, storage storage.Storage, se
 func (r *ShipmentCloseReporter) Run(ctx context.Context) error {
 	timeStart := time.Now()
 
-	//err := r.sendReport(ctx, &reports.ShipmentCloseReportData{
-	//	RouteID:               111111,
-	//	ShipmentID:            222222,
-	//	WaySheetID:            33333333,
-	//	Parking:               444444,
-	//	DriverName:            "info.Dr!!!iverName",
-	//	VehicleNumberPlate:    "info.VehicleNumberPlate",
-	//	TotalRemainsBarcodes:  5555,
-	//	TotalRemainsTares:     6666,
-	//	TotalTransferBarcodes: 777,
-	//	TotalTransferTares:    8888,
-	//	Date:                  time.Now(),
-	//	TimeCreate:            time.Now(),
-	//	TimeClose:             time.Now(),
-	//	SpName:                "data.SpName", // It is taken from these data because they were obtained when the remains were still there and this value is guaranteed to be known.
-	//	RemainsTaresInfo: []*reports.ShipmentCloseRemainsTareInfo{
-	//		{11, 22, "OfficeName", time.Now(), 33},
-	//		{11, 22, "OfficeName", time.Now(), 33},
-	//		{11, 22, "OfficeName", time.Now(), 33},
-	//		{11, 22, "OfficeName", time.Now(), 33},
-	//		{11, 22, "OfficeName", time.Now(), 33},
-	//		{11, 22, "OfficeName", time.Now(), 33},
-	//		{11, 22, "OfficeName", time.Now(), 33},
-	//		{11, 22, "OfficeName", time.Now(), 33},
-	//		{11, 22, "OfficeName", time.Now(), 33},
-	//		{11, 22, "OfficeName", time.Now(), 33},
-	//	},
-	//})
-
-	//err := r.sendReport(ctx, &reports.ShipmentCloseReportData{
-	//	RouteID:               111111,
-	//	ShipmentID:            222222,
-	//	WaySheetID:            33333333,
-	//	Parking:               444444,
-	//	DriverName:            "info.Dr!!!iverName",
-	//	VehicleNumberPlate:    "info.VehicleNumberPlate",
-	//	TotalRemainsBarcodes:  5555,
-	//	TotalRemainsTares:     6666,
-	//	TotalTransferBarcodes: 777,
-	//	TotalTransferTares:    8888,
-	//	Date:                  time.Now(),
-	//	TimeCreate:            time.Now(),
-	//	TimeClose:             time.Now(),
-	//	SpName:                "data.SpName", // It is taken from these data because they were obtained when the remains were still there and this value is guaranteed to be known.
-	//	RemainsTaresInfo: []*reports.ShipmentCloseRemainsTareInfo{
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//		{136003223891, 360089, "Гатчина проспект 25 Октября 28А", time.Now(), 33},
-	//	},
-	//})
-	//if err != nil {
-	//	panic(err)
-	//}
-
-	//os.Exit(111)
 	if timeStart.After(r.prevTimeFindShipmentsInterval.Add(r.findShipmentsInterval)) {
 		if err := r.findOpenedShipments(ctx); err != nil {
 			r.prompter.PromptError("failed finding opened shipments")
@@ -252,7 +130,7 @@ func (r *ShipmentCloseReporter) Run(ctx context.Context) error {
 			return errors.Wrap(err, "ShipmentCloseReporter.Run()", "failed sending telegram bot")
 		}
 	}
-	
+
 	r.prompter.PromptRender(time.Since(timeStart))
 	return nil
 }
@@ -663,9 +541,6 @@ func (r *ShipmentCloseReporter) sendGoogleSheets(ctx context.Context, data [][]i
 }
 
 func (r *ShipmentCloseReporter) sendTelegramBot(ctx context.Context) error {
-	//fmt.Println(data, len(data))
-	//os.Exit(11)
-
 	if r.messageQueueTG.Len() <= 0 {
 		return nil
 	}
@@ -673,22 +548,24 @@ func (r *ShipmentCloseReporter) sendTelegramBot(ctx context.Context) error {
 	for r.messageQueueTG.Len() > 0 {
 		var err error
 		err = retryAction(ctx, "ShipmentCloseReporter.sendTelegramBot()", 3, 1*time.Second, func() error {
-			data, ok := r.messageQueueTG.Peek()
+			message, ok := r.messageQueueTG.Peek()
 			if !ok {
 				return errors.New("ShipmentCloseReporter.sendTelegramBot()", "failed to get message from telegram message queue")
 			}
+
 			if r.renderModeTG == report_renderers.TelegramBotRenderHTML {
-				err = r.services.TelegramBotService.SendMessage(r.config.Telegram().ChatID(), data, "HTML")
+				err = r.services.TelegramBotService.SendMessage(r.config.Telegram().ChatID(), message, "HTML")
 			} else if r.renderModeTG == report_renderers.TelegramBotRenderMarkdown {
-				err = r.services.TelegramBotService.SendMessage(r.config.Telegram().ChatID(), data, "MarkdownV2")
+				err = r.services.TelegramBotService.SendMessage(r.config.Telegram().ChatID(), message, "MarkdownV2")
 			} else {
-				err = r.services.TelegramBotService.SendMessage(r.config.Telegram().ChatID(), data, "")
+				err = r.services.TelegramBotService.SendMessage(r.config.Telegram().ChatID(), message, "")
 			}
 			return err
 		})
 		if err != nil {
 			return errors.Wrapf(err, "ShipmentCloseReporter.sendTelegramBot()", "failed send data to chat %d", r.config.Telegram().ChatID())
 		}
+
 		r.messageQueueTG.Pop()
 	}
 

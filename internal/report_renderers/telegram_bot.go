@@ -3,10 +3,14 @@ package report_renderers
 import (
 	"strings"
 	"unsafe"
+	"wb_logistic_assistant/internal/errors"
 	"wb_logistic_assistant/internal/reports"
 )
 
-const telegramMessageLimit = 4000
+const (
+	telegramMessageLimit         = 4000
+	telegramMessageLimitOverhead = 15
+)
 
 type TelegramBotRenderMode int
 
@@ -17,11 +21,9 @@ const (
 )
 
 type TelegramBotRenderer struct {
-	Mode          TelegramBotRenderMode
-	IsTitle       bool
-	builder       *strings.Builder
-	escapeBuilder *strings.Builder
-	messages      []string
+	Mode     TelegramBotRenderMode
+	builder  *strings.Builder
+	messages []string
 
 	prefix                string
 	blockOpen, blockClose string
@@ -32,17 +34,23 @@ type TelegramBotRenderer struct {
 
 func (r *TelegramBotRenderer) Render(data *reports.ReportData) ([]string, error) {
 	r.builder = &strings.Builder{}
-	r.escapeBuilder = &strings.Builder{}
+	r.builder.Grow(telegramMessageLimit)
 	r.messages = []string{}
 
-	if data.Title != "" {
-		r.renderTitle(data.Title)
-	}
+	r.prefix = ""
+	r.blockOpen, r.blockClose = "", ""
+	r.styleOpen, r.styleClose = "", ""
+	r.linkOpen, r.linkSize = false, 0
+
 	if data.Header != nil {
-		r.render(data.Header)
+		if err := r.render(data.Header); err != nil {
+			return nil, err
+		}
 	}
 	if data.Body != nil {
-		r.render(data.Body)
+		if err := r.render(data.Body); err != nil {
+			return nil, err
+		}
 	}
 
 	if r.builder.Len() > 0 {
@@ -52,266 +60,277 @@ func (r *TelegramBotRenderer) Render(data *reports.ReportData) ([]string, error)
 	return r.messages, nil
 }
 
-func (r *TelegramBotRenderer) renderTitle(title string) {
-	switch r.Mode {
-	case TelegramBotRenderMarkdown:
-		r.builder.WriteString("*" + r.escapeMarkdown(title) + "*\n\n")
-	case TelegramBotRenderHTML:
-		r.builder.WriteString("<b>" + title + "</b>\n\n")
-	default:
-		r.builder.WriteString(title + "\n\n")
-	}
-}
-
-func (r *TelegramBotRenderer) render(item *reports.Item) {
+func (r *TelegramBotRenderer) render(item *reports.Item) error {
 	if item == nil {
-		return
+		return nil
 	}
 	switch r.Mode {
 	case TelegramBotRenderMarkdown:
-		r.renderMarkdown(item)
+		return r.renderMarkdown(item)
 	case TelegramBotRenderHTML:
-		r.renderHTML(item)
+		return r.renderHTML(item)
 	default:
 		r.renderPlain(item)
+		return nil
 	}
 }
 
-func (r *TelegramBotRenderer) renderMarkdown(item *reports.Item) {
-	for i, it := range item.Children {
-		if it.Block {
-			if i != 0 {
-				r.writeText("\n", true)
-				if r.prefix != "" {
-					r.writeText(r.prefix, true)
-				}
-			}
-		} else {
-			r.writeText(" ", true)
-		}
-
-		if it.HiddenQuote {
-			r.blockOpen = "**>"
-			r.blockClose = " ||"
-			r.prefix = ">"
-			r.writeText("**>", true)
-		} else if it.Quote {
-			r.blockOpen = ""
-			r.blockClose = ""
-			r.prefix = "> "
-			r.writeText("> ", true)
-		} else if it.Code {
-			r.blockOpen = "```"
-			r.blockClose = "```"
-			r.writeText("```", true)
-		}
-
-		if it.Bold {
-			r.styleOpen = "*"
-			r.styleClose = "*"
-			r.writeText("*", true)
-		}
-		if it.Link != "" {
-			r.linkOpen = true
-			r.linkSize = len(it.Link) + len(it.Text) + 6
-			r.writeText("[", true)
-		}
-
-		text := r.escapeMarkdown(it.Text)
-		r.writeText(text, false)
-
-		if it.Link != "" {
-			r.writeText("](", true)
-			r.writeText(it.Link, false)
-			r.writeText(")", true)
-			r.linkOpen = false
-			r.linkSize = 0
-		}
-		if it.Bold {
-			r.styleOpen = ""
-			r.styleClose = ""
-			r.writeText("*", true)
-		}
-
-		if len(it.Children) > 0 {
-			r.renderMarkdown(it)
-		}
-
-		if it.HiddenQuote {
-			r.blockOpen = ""
-			r.blockClose = ""
-			r.prefix = ""
-			r.writeText(" ||", true)
-		} else if it.Code {
-			r.blockOpen = ""
-			r.blockClose = ""
-			r.prefix = ""
-			r.writeText("\n```", true)
-		}
-	}
-}
-
-func (r *TelegramBotRenderer) renderHTML(item *reports.Item) {
-	for i, it := range item.Children {
-		if it.Block {
-			if i != 0 {
-				r.writeText("\n", true)
-			}
-		} else {
-			r.writeText(" ", true)
-		}
-
-		if it.HiddenQuote {
-			r.blockOpen = "<blockquote expandable>"
-			r.blockClose = "</blockquote>"
-			r.writeText("<blockquote expandable>", true)
-		} else if it.Quote {
-			r.blockOpen = "<blockquote>"
-			r.blockClose = "</blockquote>"
-			r.writeText("<blockquote>", true)
-		} else if it.Code {
-			r.blockOpen = "<pre><code>"
-			r.blockClose = "</code></pre>"
-			r.writeText("<pre><code>", true)
-		}
-
-		if it.Bold {
-			r.styleOpen = "<b>"
-			r.styleClose = "</b>"
-			r.writeText("<b>", true)
-		}
-		if it.Link != "" {
-			r.linkOpen = true
-			r.linkSize = len(it.Link) + len(it.Text) + 15
-			r.writeText(`<a href="`, true)
-			r.writeText(it.Link, false)
-			r.writeText(`">`, true)
-		}
-
-		r.writeText(it.Text, false)
-
-		if it.Link != "" {
-			r.linkOpen = false
-			r.linkSize = 0
-			r.writeText("</a>", true)
-		}
-		if it.Bold {
-			r.writeText("</b>", true)
-			r.styleOpen = ""
-			r.styleClose = ""
-		}
-
-		if len(it.Children) > 0 {
-			r.renderHTML(it)
-		}
-
-		if it.HiddenQuote {
-			r.writeText("</blockquote>", true)
-			r.blockOpen = ""
-			r.blockClose = ""
-		} else if it.Quote {
-			r.writeText("</blockquote>", true)
-			r.blockOpen = ""
-			r.blockClose = ""
-		} else if it.Code {
-			r.writeText("</code></pre>", true)
-			r.blockOpen = ""
-			r.blockClose = ""
-		}
-	}
-}
-
+// Plain
 func (r *TelegramBotRenderer) renderPlain(item *reports.Item) {
-	for i, it := range item.Children {
-		if it.Block && i != 0 {
-			r.writeText("\n", true)
+	for i, child := range item.Children {
+		if child.Block && i != 0 {
+			r.write("\n", false)
 		} else {
-			r.writeText(" ", true)
+			r.write(" ", false)
 		}
-		r.writeText(it.Text, false)
-		if len(it.Children) > 0 {
-			r.renderPlain(it)
+
+		r.write(child.Text, false)
+		if len(child.Link) > 0 {
+			r.write("["+child.Link+"]", false)
+		}
+
+		if len(child.Children) > 0 {
+			r.renderPlain(child)
 		}
 	}
 }
 
-func (r *TelegramBotRenderer) writeText(text string, tag bool) {
-	b := r.builder
-	curLen := b.Len()
-	textLen := len(text)
+// Markdown
+func (r *TelegramBotRenderer) renderMarkdown(item *reports.Item) error {
+	for i, child := range item.Children {
+		if child.Block && i != 0 {
+			r.write("\n", true)
+			if r.prefix != "" {
+				r.write(r.prefix, true)
+			}
+		} else if i != 0 {
+			r.write(" ", true)
+		}
 
-	const overhead = 15
-	limit := telegramMessageLimit
+		if child.HiddenQuote {
+			r.blockOpen, r.blockClose, r.prefix = "**>", " ||", "> "
+			r.write(r.blockOpen, true)
+		} else if child.Quote {
+			r.blockOpen, r.blockClose, r.prefix = "> ", "", "> "
+			r.write(r.blockOpen, true)
+		} else if child.Code {
+			r.blockOpen, r.blockClose = "```", "```"
+			r.write(r.blockOpen, true)
+		}
 
-	if curLen+textLen+overhead < limit {
-		b.WriteString(text)
-		return
+		if child.Bold {
+			r.styleOpen, r.styleClose = "*", "*"
+			r.write(r.styleOpen, true)
+		}
+		if child.Link != "" {
+			// Reflection symbols are placed in advance to accurately determine the link size
+			child.Link = r.escapeMarkdown(child.Link)
+			child.Text = r.escapeMarkdown(child.Text)
+			r.linkOpen = true
+			r.linkSize = len(child.Link) + len(child.Text) + 6
+			if r.linkSize >= telegramMessageLimit {
+				return errors.Newf("TelegramBotRenderer.renderMarkdown", "link is very large, max size %d, link size %d", telegramMessageLimit, r.linkSize)
+			}
+			r.write("[", true)
+		}
+
+		r.write(r.escapeMarkdown(child.Text), false)
+
+		if child.Link != "" {
+			// Recalculation of the link size since the link tag was previously opened and the description text was inserted, and the next time the link itself is recorded with the closing of the tag, the remaining size should be correct
+			r.linkSize = len(child.Link) + 3
+			r.write("]("+child.Link+")", true)
+			r.linkOpen = false
+			r.linkSize = 0
+		}
+		if child.Bold {
+			r.styleClose = ""
+			r.styleOpen = ""
+			r.write("*", true)
+		}
+
+		if len(child.Children) > 0 {
+			if err := r.renderMarkdown(child); err != nil {
+				return err
+			}
+		}
+
+		if child.HiddenQuote {
+			r.blockOpen, r.blockClose, r.prefix = "", "", ""
+			r.write(" ||", true)
+		} else if child.Code {
+			r.blockOpen, r.blockClose, r.prefix = "", "", ""
+			r.write("\n```", true)
+		}
 	}
-
-	if r.linkOpen && r.linkSize < limit && curLen+r.linkSize >= limit {
-		r.fastFlush()
-		r.fastWriteOpenTags()
-		b.WriteString(text)
-		return
-	}
-
-	if tag {
-		r.fastFlush()
-		r.fastWriteOpenTags()
-		b.WriteString(text)
-		return
-	}
-
-	writeLen := limit - curLen - overhead
-	if writeLen > 0 {
-		b.WriteString(text[:writeLen])
-	}
-
-	r.fastFlush()
-	r.fastWriteOpenTags()
-
-	if writeLen < textLen {
-		b.WriteString(text[writeLen:])
-	}
-}
-
-func (r *TelegramBotRenderer) fastFlush() {
-	b := r.builder
-
-	if r.styleClose != "" {
-		b.WriteString(r.styleClose)
-	}
-	if r.blockClose != "" {
-		b.WriteString(r.blockClose)
-	}
-
-	r.messages = append(r.messages, b.String())
-	b.Reset()
-}
-
-func (r *TelegramBotRenderer) fastWriteOpenTags() {
-	b := r.builder
-	if r.blockOpen != "" {
-		b.WriteString(r.blockOpen)
-	}
-	if r.styleOpen != "" {
-		b.WriteString(r.styleOpen)
-	}
+	return nil
 }
 
 func (r *TelegramBotRenderer) escapeMarkdown(s string) string {
+	if s == "" {
+		return ""
+	}
 	n := len(s)
 	buf := make([]byte, 0, n+n/8)
-
 	for i := 0; i < n; i++ {
 		ch := s[i]
 		switch ch {
 		case '!', '*', '_', '-', '~', '`', '[', ']', '(', ')', '>', '|', '.':
+			// skip if reflection already exists
+			if i != 0 && s[i-1] == '\\' {
+				continue
+			}
 			buf = append(buf, '\\', ch)
 		default:
 			buf = append(buf, ch)
 		}
 	}
-
 	return *(*string)(unsafe.Pointer(&buf))
+}
+
+// HTML
+func (r *TelegramBotRenderer) renderHTML(item *reports.Item) error {
+	for i, child := range item.Children {
+		if child.Block && i != 0 {
+			r.write("\n", true)
+		} else if i != 0 {
+			r.write(" ", true)
+		}
+
+		if child.HiddenQuote {
+			r.blockOpen, r.blockClose = "<blockquote expandable>", "</blockquote>"
+			r.write(r.blockOpen, true)
+		} else if child.Quote {
+			r.blockOpen, r.blockClose = "<blockquote>", "</blockquote>"
+			r.write(r.blockOpen, true)
+		} else if child.Code {
+			r.blockOpen, r.blockClose = "<pre><code>", "</code></pre>"
+			r.write(r.blockOpen, true)
+		}
+
+		if child.Bold {
+			r.styleOpen, r.styleClose = "<b>", "</b>"
+			r.write(r.styleOpen, true)
+		}
+		if child.Link != "" {
+			r.linkOpen = true
+			r.linkSize = len(child.Link) + len(child.Text) + 15
+			if r.linkSize >= telegramMessageLimit {
+				return errors.Newf("TelegramBotRenderer.renderHTML()", "link is very large, max size %d, link size %d", telegramMessageLimit, r.linkSize)
+			}
+			r.write(`<a href="`+child.Link+`">`, true)
+		}
+
+		r.write(child.Text, false)
+
+		if child.Link != "" {
+			r.linkOpen = false
+			r.linkSize = 0
+			r.write("</a>", true)
+		}
+		if child.Bold {
+			r.write("</b>", true)
+			r.styleOpen = ""
+			r.styleClose = ""
+		}
+
+		if len(child.Children) > 0 {
+			err := r.renderHTML(child)
+			if err != nil {
+				return err
+			}
+		}
+
+		switch {
+		case child.HiddenQuote, child.Quote:
+			r.write("</blockquote>", true)
+		case child.Code:
+			r.write("</code></pre>", true)
+		}
+	}
+	return nil
+}
+
+func (r *TelegramBotRenderer) write(text string, tag bool) {
+	if text == "" {
+		return
+	}
+	builder := r.builder
+	builderLen := builder.Len()
+	textLen := len(text)
+
+	// if a link is open and the entire link needs to be placed there, we move the entire link into a new message
+	if r.linkOpen && r.linkSize < telegramMessageLimit && builderLen+r.linkSize > telegramMessageLimit {
+		r.flush()
+		r.writeOpenTags()
+		builder.WriteString(text)
+		return
+	}
+
+	// if it fits completely, write it down immediately.
+	if builderLen+textLen+telegramMessageLimitOverhead < telegramMessageLimit {
+		builder.WriteString(text)
+		return
+	}
+
+	if tag {
+		r.flush()
+		r.writeOpenTags()
+		builder.WriteString(text)
+		return
+	}
+
+	writeLen := telegramMessageLimit - builderLen - telegramMessageLimitOverhead
+	if writeLen > 0 {
+		safeText := safeCutTextAlongRune(text, writeLen)
+		if r.Mode == TelegramBotRenderMarkdown && safeText != "" && safeText[len(safeText)-1] == '\\' {
+			text = text[len(safeText)-1:]
+			safeText = safeText[:len(safeText)-1]
+		} else {
+			text = text[len(safeText):]
+		}
+		if safeText != "" {
+			builder.WriteString(safeText)
+		}
+	} else {
+		text = ""
+	}
+
+	r.flush()
+	r.writeOpenTags()
+
+	if len(text) > 0 {
+		builder.WriteString(text)
+	}
+}
+
+func (r *TelegramBotRenderer) flush() {
+	if r.styleOpen != "" {
+		r.builder.WriteString(r.styleClose)
+	}
+	if r.blockOpen != "" {
+		r.builder.WriteString(r.blockClose)
+	}
+	r.messages = append(r.messages, r.builder.String())
+	r.builder.Reset()
+}
+
+func (r *TelegramBotRenderer) writeOpenTags() {
+	if r.blockOpen != "" {
+		r.builder.WriteString(r.blockOpen)
+	}
+	if r.styleOpen != "" {
+		r.builder.WriteString(r.styleOpen)
+	}
+}
+
+func safeCutTextAlongRune(s string, lim int) string {
+	if len(s) <= lim {
+		return s
+	}
+	i := lim
+	for i > 0 && (s[i]&0xC0) == 0x80 {
+		i--
+	}
+	return s[:i]
 }

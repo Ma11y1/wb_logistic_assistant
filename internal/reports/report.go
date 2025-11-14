@@ -1,9 +1,8 @@
 package reports
 
 type ReportData struct {
-	Title  string `json:"title"`
-	Header *Item  `json:"header"`
-	Body   *Item  `json:"body"`
+	Header *Item `json:"header"`
+	Body   *Item `json:"body"`
 }
 
 func NewReportDataBySize() *ReportData {
