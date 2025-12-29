@@ -112,7 +112,7 @@ func (r *FinanceRoutesReporter) findOpenedWaySheets(ctx context.Context) error {
 		if !ok && !waySheet.CloseDt.IsZero() {
 			continue
 		}
-		if r.isValidRoute(atoiSafe(waySheet.RouteCarID), atoiSafe(waySheet.SupplierID)) {
+		if r.isValidSupplier(atoiSafe(waySheet.SupplierID)) {
 			r.chOpenedWaySheets[waySheet.WaySheetID] = waySheet
 		}
 	}
@@ -231,7 +231,7 @@ func (r *FinanceRoutesReporter) processOpenedWaySheets(ctx context.Context) erro
 	return nil
 }
 
-func (r *FinanceRoutesReporter) isValidRoute(routeID, supplierID int) bool {
+func (r *FinanceRoutesReporter) isValidSupplier(supplierID int) bool {
 	if _, ok := r.suppliers[supplierID]; !ok {
 		return false
 	}

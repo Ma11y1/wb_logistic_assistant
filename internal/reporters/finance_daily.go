@@ -76,6 +76,10 @@ type FinanceDailyReporter struct {
 }
 
 func NewFinanceDailyReporter(config *config.Config, storage storage.Storage, service *services.Container, prompter prompters.FinanceDailyReporterPrompter) *FinanceDailyReporter {
+	expensesDaily := 0.0
+	if config.Logistic().Office().Expenses() != 0 && config.Logistic().Office().ExpensesPeriod() != 0 {
+		expensesDaily = config.Logistic().Office().Expenses() / float64(config.Logistic().Office().ExpensesPeriod())
+	}
 	return &FinanceDailyReporter{
 		config:        config,
 		storage:       storage,
@@ -98,7 +102,7 @@ func NewFinanceDailyReporter(config *config.Config, storage storage.Storage, ser
 		taxRate:           config.Logistic().Office().PercentTax() / 100,
 		percentMarriage:   config.Logistic().Office().PercentMarriage(),
 		marriageRate:      config.Logistic().Office().PercentMarriage() / 100,
-		expensesDaily:     config.Logistic().Office().Expenses() / float64(config.Logistic().Office().ExpensesPeriod()),
+		expensesDaily:     expensesDaily,
 		dayOffset:         config.Reports().FinanceDaily().DayOffset(),
 		isRender:          config.Reports().FinanceDaily().RenderAtStart(),
 
@@ -127,6 +131,7 @@ func (r *FinanceDailyReporter) Run(ctx context.Context) error {
 	r.timeLastRender = now
 
 	if !r.isRender {
+		r.prompter.PromptFinish(time.Since(now))
 		return nil
 	}
 
@@ -174,12 +179,12 @@ func (r *FinanceDailyReporter) processWaySheets(ctx context.Context) error {
 			continue
 		}
 
-		routeID := atoiSafe(waySheet.RouteCarID)
 		supplierID := atoiSafe(waySheet.SupplierID)
-		if !r.isValidRoute(routeID, supplierID) {
+		if !r.isValidSupplier(supplierID) {
 			continue
 		}
 
+		routeID := atoiSafe(waySheet.RouteCarID)
 		data, ok := r.chData[routeID]
 		if !ok {
 			data = &FinanceDailyReporterData{DateStart: timeStart, DateEnd: timeEnd, RouteID: routeID}
@@ -370,7 +375,7 @@ func (r *FinanceDailyReporter) processReports(ctx context.Context) error {
 	return nil
 }
 
-func (r *FinanceDailyReporter) isValidRoute(routeID, supplierID int) bool {
+func (r *FinanceDailyReporter) isValidSupplier(supplierID int) bool {
 	if _, ok := r.suppliers[supplierID]; !ok {
 		return false
 	}

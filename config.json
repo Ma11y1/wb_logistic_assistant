@@ -1,0 +1,171 @@
+{
+  "debug": {
+    "enabled": false,
+    "path": ".log"
+  },
+  "reports": {
+    "general_routes": {
+      "enabled": false,
+      "err_retry_task_limit": 3,
+      "task_timeout": 600000,
+      "polling_interval": 10000,
+      "interval_reset_change_barcodes": 300000,
+      "interval_update_rating": 2000000,
+      "interval_update_shipments": 130000,
+      "interval_update_waysheets": 200000,
+      "sort": true,
+      "sort_ascending": false,
+      "sort_column": 5,
+      "render_google_sheets": true
+    },
+    "shipment_close": {
+      "enabled": false,
+      "err_retry_task_limit": 3,
+      "task_timeout": 600000,
+      "polling_interval": 60000,
+      "interval_update_shipments": 150000,
+      "render_google_sheets": false,
+      "render_telegram_bot": true
+    },
+    "finance_routes": {
+      "enabled": false,
+      "err_retry_task_limit": 3,
+      "task_timeout": 600000,
+      "polling_interval": 100000,
+      "render_telegram_bot": true
+    },
+    "finance_daily": {
+      "enabled": true,
+      "err_retry_task_limit": 3,
+      "task_timeout": 600000,
+      "polling_interval": 200000,
+      "render_at_start": true,
+      "day_offset": -2,
+      "render_telegram_bot": false
+    }
+  },
+  "storage": {
+    "path": "./storage.json"
+  },
+  "logistic": {
+    "wb_client": {
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      "sec_user_agent": "\"Chromium\";v=\"142\", \"Google Chrome\";v=\"142\", \"Not_A Brand\";v=\"99\"",
+      "platform": "\"Windows\""
+    },
+    "office": {
+      "id": 312259,
+      "suppliers": [194009],
+      "skip_routes": [9782,30221,30661,32397,36098,29281],
+      "percent_tax": 5,
+      "percent_marriage": 9,
+      "expenses": 2145000,
+      "expenses_period": 15,
+      "salary_rate_percent": {
+        "39810": 85
+      },
+      "salary_rate": {
+        "24448": 6000,
+        "9816": 5500,
+        "37178": 5000,
+        "9820": 5000,
+        "19223": 5500,
+        "9819": 3000,
+        "18785": 5000,
+        "9821": 5000,
+        "36906": 6000,
+        "29421": 6000,
+        "9814": 7000,
+        "36908": 5000,
+        "42941": 5000,
+        "17010": 3500,
+        "11246": 5200,
+        "29124": 5000,
+        "32751": 6000,
+        "44334": 5500,
+        "16818": 4800,
+        "30000": 4800,
+        "36645": 7000,
+        "17314": 3500,
+        "9817": 5500,
+        "9809": 5000,
+        "29898": 5500,
+        "43776": 5000,
+        "36921": 5200,
+        "31582": 5200,
+        "35681": 7000,
+        "41680": 5000,
+        "41682": 3000,
+        "37186": 5000,
+        "17555": 5500,
+        "18767": 9500,
+        "11242": 5500,
+        "36458": 5500,
+        "36917": 6500,
+        "38608": 6500,
+        "11247": 6000,
+        "9826": 5500,
+        "11243": 4500,
+        "37728": 4800,
+        "19238": 6000,
+        "10261": 6000,
+        "9810": 5700,
+        "9815": 5800,
+        "9822": 3000,
+        "24591": 5300,
+        "25483": 5200,
+        "25485": 5000,
+        "25486": 6000,
+        "26673": 7000,
+        "26955": 5500,
+        "38055": 3000,
+        "36172": 5500,
+        "39818": 6000,
+        "39827": 5000,
+        "40482": 7500,
+        "42068": 7000,
+        "42190": 5000,
+        "42617": 9000
+      }
+    },
+    "cache_ttl": {
+      "user_info": 3600000,
+      "remains_last_mile_report":10000,
+      "remains_last_mile_report_route_info": 300000,
+      "jobs_scheduling": 1000000,
+      "shipment_info": 100000,
+      "shipment_transfers": 10000,
+      "way_sheet_info": 180000,
+      "way_sheet_finance_details": 200000
+    }
+  },
+  "google_sheets": {
+    "client": {
+      "seconds_wait_server": 60,
+      "oauth": true,
+      "oauth_credentials": "./google_oauth.json",
+      "service_credentials": "./google_service.json"
+    },
+    "report_sheets": {
+      "general_routes": {
+        "spreadsheet_id": "id",
+        "sheet_name": "list_name"
+      },
+      "shipment_close": {
+        "spreadsheet_id": "id",
+        "sheet_name": "list_name"
+      }
+    }
+  },
+  "telegram_bot": {
+    "shipment_close": {
+      "chat_id": -11
+    },
+    "finance_routes": {
+      "chat_id": -12
+    },
+    "finance_daily": {
+      "chat_id": -13
+    }
+  }
+}
