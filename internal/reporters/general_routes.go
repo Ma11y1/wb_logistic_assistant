@@ -114,6 +114,10 @@ func (r *GeneralRoutesReporter) Run(ctx context.Context) error {
 		r.chReportMetaData = &reports.GeneralRoutesReportMetaData{}
 		clear(r.chReportData)
 		clear(r.chRouteData)
+		r.prevResetChangeBarcodes = time.Time{}
+		r.prevUpdateRating = time.Time{}
+		r.prevUpdateShipments = time.Time{}
+		r.prevUpdateWaySheets = time.Time{}
 		r.prevClearCache = now
 	}
 

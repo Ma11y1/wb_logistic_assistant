@@ -433,7 +433,12 @@ func (r *GeneralRoutesSheetReport) Render(meta *GeneralRoutesReportMetaData, rou
 			row[r.columnRating] = &Item{Text: " "}
 		}
 
-		row[r.columnShipmentID] = &Item{Text: itoa(route.ShipmentID), Link: "https://logistics.wildberries.ru/external-logistics/shipments-shell/shipments/" + strconv.Itoa(route.ShipmentID)}
+		if route.ShipmentID > 0 {
+			row[r.columnShipmentID] = &Item{Text: itoa(route.ShipmentID), Link: "https://logistics.wildberries.ru/external-logistics/shipments-shell/shipments/" + strconv.Itoa(route.ShipmentID)}
+		} else {
+			row[r.columnShipmentID] = &Item{Text: " "}
+		}
+
 		if route.ShipmentCreateDate.IsZero() {
 			row[r.columnShipmentCreateDate] = &Item{Text: " "}
 		} else {
