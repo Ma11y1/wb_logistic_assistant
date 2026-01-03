@@ -8,6 +8,8 @@ import (
 	"wb_logistic_assistant/internal/logger"
 )
 
+var NullTime = time.Time{}
+
 func atoiSafe(s string) int {
 	v, _ := strconv.ParseInt(s, 10, 64)
 	return int(v)
@@ -42,7 +44,7 @@ func retryAction(ctx context.Context, source string, attempts int, delay time.Du
 
 // SpNameToGateParking parse sp name and returns values.
 //
-//	Input example: шуш143.вор89-92.буфер303, Буфер_Маршрут 62"
+//	Input example: шуш143.вор89-92.буфер303, Буфер_Маршрут 62, СЦМШ143_Буфер в МШ 177
 //	Returns example: 89, 303
 func SpNameToGateParking(s string) (gate, parking int) {
 	b := []byte(s)
@@ -58,7 +60,7 @@ func SpNameToGateParking(s string) (gate, parking int) {
 			b[i+4] == 0xD1 && b[i+5] == 0x80 {
 
 			i += 6
-
+			gate = 0
 			for i < n && b[i] == ' ' {
 				i++
 			}
@@ -79,11 +81,27 @@ func SpNameToGateParking(s string) (gate, parking int) {
 			b[i+8] == 0xD1 && b[i+9] == 0x80 {
 
 			i += 10
-
+			parking = 0
 			for i < n && b[i] == ' ' {
 				i++
 			}
 
+			for i < n && b[i] >= '0' && b[i] <= '9' {
+				parking = parking*10 + int(b[i]-'0')
+				i++
+			}
+			continue
+		}
+
+		if i+5 <= n && b[i] == ' ' &&
+			b[i+1] == 0xD0 && b[i+2] == 0x9C && // М
+			b[i+3] == 0xD0 && b[i+4] == 0xA8 { // Ш
+
+			i += 5
+			parking = 0
+			for i < n && b[i] == ' ' {
+				i++
+			}
 			for i < n && b[i] >= '0' && b[i] <= '9' {
 				parking = parking*10 + int(b[i]-'0')
 				i++
@@ -102,7 +120,7 @@ func SpNameToGateParking(s string) (gate, parking int) {
 			b[i+12] == 0xD1 && b[i+13] == 0x82 { // т
 
 			i += 14
-
+			parking = 0
 			for i < n && b[i] == ' ' {
 				i++
 			}

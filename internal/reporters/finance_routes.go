@@ -84,12 +84,12 @@ func (r *FinanceRoutesReporter) Run(ctx context.Context) error {
 
 	now := time.Now()
 
-	if err := r.findOpenedWaySheets(ctx); err != nil {
+	if err = r.findOpenedWaySheets(ctx); err != nil {
 		r.prompter.PromptError("Failed finding opened way sheets")
 		return errors.Wrap(err, "FinanceRoutesReporter.Run()", "failed finding opened way sheets")
 	}
 
-	if err := r.processOpenedWaySheets(ctx); err != nil {
+	if err = r.processOpenedWaySheets(ctx); err != nil {
 		r.prompter.PromptError("Failed processing opened way sheets")
 		return errors.Wrap(err, "FinanceRoutesReporter.Run()", "failed processing opened way sheets")
 	}

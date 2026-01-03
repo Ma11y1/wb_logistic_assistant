@@ -18,13 +18,15 @@ import (
 
 type generalRoutesRouteData struct {
 	routeID            int
+	parking            int
 	changeBarcodes     int
 	prevBarcodes       int
+	remainsBarcodes    int
 	shipmentID         int
-	isShipmentOpen     bool
-	lastOpenWaySheet   *wb_models.WaySheet
-	bestClosedWaySheet *wb_models.WaySheet
-	prevClosedWaySheet *wb_models.WaySheet
+	shipmentCreateDate time.Time
+	shipmentCloseDate  time.Time
+	lastWaySheet       *wb_models.WaySheet
+	prevWaySheet       *wb_models.WaySheet
 }
 
 type GeneralRoutesReporter struct {
@@ -45,20 +47,21 @@ type GeneralRoutesReporter struct {
 	intervalUpdateRating        time.Duration
 	intervalUpdateShipments     time.Duration
 	intervalUpdateWaySheets     time.Duration
+	intervalClearCache          time.Duration
 	prevResetChangeBarcodes     time.Time
 	prevUpdateRating            time.Time
 	prevUpdateShipments         time.Time
 	prevUpdateWaySheets         time.Time
+	prevClearCache              time.Time
 
 	spreadsheetID string
 	sheetName     string
 	sheetPosition string
 
-	chReportMetaData        *reports.GeneralRoutesReportMetaData
-	chReportDataList        []*reports.GeneralRoutesReportData
-	chReportData            map[int]*reports.GeneralRoutesReportData // report id -> ReportData
-	chRouteData             map[int]*generalRoutesRouteData          // report id -> RoutesData
-	chRemainsLastMileReport *wb_models.RemainsLastMileReport
+	chReportMetaData *reports.GeneralRoutesReportMetaData
+	chReportDataList []*reports.GeneralRoutesReportData
+	chReportData     map[int]*reports.GeneralRoutesReportData // report id -> ReportData
+	chRouteData      map[int]*generalRoutesRouteData          // report id -> RoutesData
 }
 
 func NewGeneralRoutesReporter(config *config.Config, storage storage.Storage, services *services.Container, prompter prompters.GeneralRoutesReporterPrompter) *GeneralRoutesReporter {
@@ -84,6 +87,7 @@ func NewGeneralRoutesReporter(config *config.Config, storage storage.Storage, se
 		intervalUpdateRating:        config.Reports().GeneralRoutes().IntervalUpdateRating(),
 		intervalUpdateShipments:     config.Reports().GeneralRoutes().IntervalUpdateShipments(),
 		intervalUpdateWaySheets:     config.Reports().GeneralRoutes().IntervalUpdateWaySheets(),
+		intervalClearCache:          24 * time.Hour,
 
 		spreadsheetID: config.GoogleSheets().ReportSheets().GeneralRoutes().SpreadsheetID(),
 		sheetName:     config.GoogleSheets().ReportSheets().GeneralRoutes().SheetName(),
@@ -103,197 +107,194 @@ func (r *GeneralRoutesReporter) Run(ctx context.Context) error {
 
 	r.prompter.PromptStart()
 
-	timeStart := time.Now()
-
-	remainsReport, err := r.loadRemainsLastMileReport(ctx)
-	if err != nil {
-		r.prompter.PromptError("Failed load remains last miles report")
-		return errors.Wrap(err, "GeneralRoutesReporter.Run()", "failed load remains last miles report")
-	}
-
+	now := time.Now()
 	r.chReportDataList = r.chReportDataList[:0]
-	isResetChangeBarcodes := timeStart.After(r.prevResetChangeBarcodes.Add(r.intervalResetChangeBarcodes))
-	isUpdateShipments := timeStart.After(r.prevUpdateShipments.Add(r.intervalUpdateShipments))
 
-	for _, route := range remainsReport.Routes {
-		if !r.isValidRoute(route) {
-			continue
-		}
-		time.Sleep(100 * time.Millisecond)
-
-		routeID := route.CarID
-		routeData := r.chRouteData[routeID]
-		reportData := r.chReportData[routeID]
-
-		if routeData == nil {
-			routeData = &generalRoutesRouteData{routeID: routeID}
-			r.chRouteData[routeID] = routeData
-		}
-		if reportData == nil {
-			reportData = &reports.GeneralRoutesReportData{RouteID: routeID}
-			r.chReportData[routeID] = reportData
-		}
-		r.chReportDataList = append(r.chReportDataList, reportData)
-
-		reportData.Tares = route.CountTares
-		reportData.VolumeLiters = float32(route.VolumeMlByContent) / 1000 // Ml to litters
-		if route.NormativeInLiters > 0 {
-			reportData.VolumeNormativeLitersPercent = reportData.VolumeLiters / route.NormativeInLiters * 100
-		} else {
-			reportData.VolumeNormativeLitersPercent = 0
-		}
-		reportData.VolumeNormativeLiters = route.NormativeInLiters
-
-		// Barcodes
-		if isResetChangeBarcodes {
-			r.chReportMetaData.TimeUpdateChangeBarcodes = time.Now()
-			routeData.changeBarcodes = 0
-		} else {
-			// it's worth using 'else' so that the first pass is not the current value of the barcodes, but is immediately reset
-			routeData.changeBarcodes += route.CountShk - routeData.prevBarcodes
-		}
-		reportData.Barcodes = route.CountShk
-		reportData.ChangeBarcodes = routeData.changeBarcodes
-		routeData.prevBarcodes = route.CountShk
-
-		// First Parking and Sp name. Next updates to the parking and sp name will be when the shipment closes
-		if reportData.Parking == 0 {
-			routeInfo, err := r.loadRemainsLastMileReportInfo(ctx, routeID)
-			if err != nil {
-				r.prompter.PromptError(fmt.Sprintf("Failed load route info for route %d", routeID))
-				logger.Logf(logger.ERROR, "GeneralRoutesReporter.Run()", "failed load route info for route %d: %v", routeID, err)
-				continue
-			}
-			parking, _, err := r.loadParkingAndRemainsBarcodesByRouteInfo(ctx, routeInfo)
-			if err != nil {
-				r.prompter.PromptError(fmt.Sprintf("Failed load parking for route %d", routeID))
-				logger.Logf(logger.ERROR, "GeneralRoutesReporter.Run()", "failed load parking and sp name for route %d: %v", routeID, err)
-			} else {
-				reportData.Parking = parking
-			}
-		}
-
-		// Shipments
-		if isUpdateShipments {
-			routeInfo, err := r.loadRemainsLastMileReportInfo(ctx, routeID)
-			if err != nil {
-				r.prompter.PromptError(fmt.Sprintf("Failed load route info for route %d", routeID))
-				logger.Logf(logger.ERROR, "GeneralRoutesReporter.Run()", "failed load route info for route %d: %v", routeID, err)
-				continue
-			}
-
-			if err = r.processShipments(ctx, route, routeInfo); err != nil {
-				r.prompter.PromptError(fmt.Sprintf("Failed process shipments for route %d", routeID))
-				logger.Logf(logger.ERROR, "GeneralRoutesReporter.Run()", "failed process shipments for route %d: %v", routeID, err)
-			}
-		}
+	if now.After(r.prevClearCache.Add(r.intervalClearCache)) {
+		r.chReportMetaData = &reports.GeneralRoutesReportMetaData{}
+		clear(r.chReportData)
+		clear(r.chRouteData)
+		r.prevClearCache = now
 	}
 
-	if isResetChangeBarcodes {
-		r.prevResetChangeBarcodes = timeStart
+	err := r.processReport(ctx, now)
+	if err != nil {
+		return errors.Wrap(err, "GeneralRoutesReporter.Run()", "failed processing routes")
 	}
-	if isUpdateShipments {
-		logger.Log(logger.INFO, "GeneralRoutesReporter.Run()", "shipments updated")
-		r.prompter.PromptUpdateShipments()
-		r.prevUpdateShipments = timeStart
-	}
-
-	// Way sheets
-	if timeStart.After(r.prevUpdateWaySheets.Add(r.intervalUpdateWaySheets)) {
-		if err = r.processWaySheets(ctx, remainsReport); err != nil {
-			r.prompter.PromptError("Failed process way sheets")
-			logger.Logf(logger.ERROR, "GeneralRoutesReporter.Run()", "failed process way sheets: %v", err)
-		} else {
-			r.prompter.PromptUpdateWaySheets()
-			logger.Log(logger.INFO, "GeneralRoutesReporter.Run()", "way sheets updated")
-			r.prevUpdateWaySheets = timeStart
-		}
-	}
-
-	// Rating
-	if timeStart.After(r.prevUpdateRating.Add(r.intervalUpdateRating)) {
-		if err = r.processRating(ctx); err != nil {
-			r.prompter.PromptError("Failed process rating")
-			logger.Logf(logger.ERROR, "GeneralRoutesReporter.Run()", "failed processing rating: %v", err)
-		} else {
-			r.prompter.PromptUpdateRating()
-			logger.Log(logger.INFO, "GeneralRoutesReporter.Run()", "rating updated")
-			r.prevUpdateRating = timeStart
-		}
-	}
-
-	logger.Logf(logger.INFO, "GeneralRoutesReporter.Run()", "update routes %d", len(remainsReport.Routes))
-	r.prompter.PromptUpdateRoutes(len(remainsReport.Routes))
-
-	r.chReportMetaData.Update = time.Now()
 
 	if err = r.sendReport(ctx, r.chReportMetaData, r.chReportDataList); err != nil {
 		r.prompter.PromptError("Failed send report")
 		return errors.Wrap(err, "GeneralRoutesReporter.Run()", "failed send report")
 	}
 
-	r.prompter.PromptFinish(time.Since(timeStart))
+	r.prompter.PromptFinish(time.Since(now))
 	return nil
 }
 
-func (r *GeneralRoutesReporter) processRating(ctx context.Context) error {
-	logger.Log(logger.INFO, "GeneralRoutesReporter.processShipments()", "start process rating")
+func (r *GeneralRoutesReporter) processReport(ctx context.Context, now time.Time) error {
+	logger.Log(logger.INFO, "GeneralRoutesReporter.processReport()", "start process report")
 
-	jobsScheduling, err := r.loadJobsScheduling(ctx)
+	remainsReport, err := r.loadRemainsLastMileReport(ctx)
 	if err != nil {
-		return err
+		r.prompter.PromptError("Failed load remains last miles report")
+		return errors.Wrap(err, "GeneralRoutesReporter.processReport()", "failed load remains last miles report")
 	}
 
-	for _, route := range jobsScheduling.Route {
-		if route == nil || route.Rating == nil || route.SrcOfficeId != r.officeID {
+	isResetChangeBarcodes := now.After(r.prevResetChangeBarcodes.Add(r.intervalResetChangeBarcodes))
+	if isResetChangeBarcodes {
+		r.chReportMetaData.TimeUpdateChangeBarcodes = now
+		r.prevResetChangeBarcodes = now
+	}
+
+	isUpdateShipment := now.After(r.prevUpdateShipments.Add(r.intervalUpdateShipments))
+	isUpdatedShipments := true // have all shipments been updated?
+
+	countRoutes := 0
+	for _, route := range remainsReport.Routes {
+		if !r.isValidRoute(route) {
 			continue
 		}
+		countRoutes++
+		routeID := route.CarID
 
-		reportData := r.chReportData[route.RouteID]
+		// Data
+		routeData := r.chRouteData[routeID]
+		if routeData == nil {
+			routeData = &generalRoutesRouteData{routeID: routeID}
+			r.chRouteData[routeID] = routeData
+		}
+
+		reportData := r.chReportData[routeID]
 		if reportData == nil {
-			logger.Logf(logger.WARN, "GeneralRoutesReporter.processRating()", "there is no report data for the route %d", route.RouteID)
-			continue
+			reportData = &reports.GeneralRoutesReportData{RouteID: routeID}
+			r.chReportData[routeID] = reportData
 		}
 
-		reportData.Rating = float32(route.Rating.OverallRating)
+		r.chReportDataList = append(r.chReportDataList, reportData)
+
+		// First Parking and Sp name. Next updates to the parking and sp name will be when the shipment closes
+		if routeData.parking == 0 {
+			time.Sleep(200 * time.Millisecond)
+			routeData.parking, err = r.loadParking(ctx, routeID)
+			if err != nil {
+				r.prompter.PromptError(fmt.Sprintf("Failed load route info for route %d", routeID))
+				logger.Logf(logger.ERROR, "GeneralRoutesReporter.processReport()", "failed load route info for route %d: %v", routeID, err)
+			}
+		}
+		reportData.Parking = routeData.parking
+
+		// Tares
+		reportData.Tares = route.CountTares
+
+		// Volume
+		volumeLiters := float32(route.VolumeMlByContent) / 1000 // Ml to litters
+		if route.NormativeInLiters > 0 {
+			reportData.VolumeNormativeLitersPercent = volumeLiters / route.NormativeInLiters * 100
+		}
+		reportData.VolumeLiters = volumeLiters
+		reportData.VolumeNormativeLiters = route.NormativeInLiters
+
+		// Barcodes
+		if isResetChangeBarcodes {
+			routeData.changeBarcodes = 0
+		} else {
+			// it's worth using 'else' so that the first pass is not the current value of the barcodes, but is immediately reset
+			routeData.changeBarcodes += route.CountShk - routeData.prevBarcodes
+		}
+		routeData.prevBarcodes = route.CountShk
+
+		reportData.Barcodes = route.CountShk
+		reportData.ChangeBarcodes = routeData.changeBarcodes
+
+		// Shipments
+		if isUpdateShipment {
+			if err = r.processShipment(ctx, route); err != nil {
+				isUpdatedShipments = false
+				r.prompter.PromptError(fmt.Sprintf("Failed process shipment for route %d", routeID))
+				logger.Logf(logger.ERROR, "GeneralRoutesReporter.processReport()", "failed process shipment for route %d: %v", routeID, err)
+			}
+		}
+		reportData.ShipmentID = routeData.shipmentID
+		reportData.ShipmentCreateDate = routeData.shipmentCreateDate
+		reportData.ShipmentCloseDate = routeData.shipmentCloseDate
+		reportData.RemainsBarcodes = routeData.remainsBarcodes
 	}
-	r.chReportMetaData.TimeUpdateRating = time.Now()
+
+	if isUpdateShipment && isUpdatedShipments {
+		logger.Log(logger.INFO, "GeneralRoutesReporter.processReport()", "all shipments updated")
+		r.prompter.PromptUpdateShipments()
+		r.prevUpdateShipments = now
+		r.chReportMetaData.TimeUpdateShipments = now
+	}
+
+	// Way sheets
+	if now.After(r.prevUpdateWaySheets.Add(r.intervalUpdateWaySheets)) {
+		if err = r.processWaySheets(ctx, remainsReport); err != nil {
+			r.prompter.PromptError("Failed process way sheets")
+			logger.Logf(logger.ERROR, "GeneralRoutesReporter.processReport()", "failed process way sheets: %v", err)
+		} else {
+			r.prompter.PromptUpdateWaySheets()
+			logger.Log(logger.INFO, "GeneralRoutesReporter.processReport()", "way sheets updated")
+			r.prevUpdateWaySheets = now
+		}
+	}
+
+	// Rating
+	if now.After(r.prevUpdateRating.Add(r.intervalUpdateRating)) {
+		if err = r.processRating(ctx); err != nil {
+			r.prompter.PromptError("Failed process rating")
+			logger.Logf(logger.ERROR, "GeneralRoutesReporter.processReport()", "failed processing rating: %v", err)
+		} else {
+			r.prompter.PromptUpdateRating()
+			logger.Log(logger.INFO, "GeneralRoutesReporter.processReport()", "rating updated")
+			r.prevUpdateRating = now
+			r.chReportMetaData.TimeUpdateRating = now
+		}
+	}
+
+	r.chReportMetaData.Update = time.Now()
+	logger.Logf(logger.INFO, "GeneralRoutesReporter.processReport()", "update routes %d", countRoutes)
+	r.prompter.PromptUpdateRoutes(countRoutes)
+
 	return nil
 }
 
-func (r *GeneralRoutesReporter) processShipments(ctx context.Context, route *wb_models.Route, routesInfo []*wb_models.RemainsLastMileReportsRouteInfo) error {
-	if len(routesInfo) == 0 {
-		return errors.Newf("GeneralRoutesReporter.processShipments()", "failed process shipments: destination office addresses could not be found, route %d", route.CarID)
+func (r *GeneralRoutesReporter) processShipment(ctx context.Context, route *wb_models.Route) error {
+	routeID := route.CarID
+
+	routeInfo, err := r.loadRemainsLastMileReportInfo(ctx, routeID)
+	if err != nil {
+		return errors.Wrapf(err, "GeneralRoutesReporter.processShipment()", "failed load route info for route %d", routeID)
+	}
+
+	if len(routeInfo) == 0 {
+		return errors.Newf("GeneralRoutesReporter.processShipment()", "destination office addresses could not be found, route %d", route.CarID)
 	}
 
 	officeName := ""
-	for _, info := range routesInfo {
+	for _, info := range routeInfo {
 		if info != nil && info.DestinationOfficeName != "" {
 			officeName = info.DestinationOfficeName
 			break
 		}
 	}
-
 	if officeName == "" {
-		return errors.Newf("GeneralRoutesReporter.processShipments()", "failed process shipments: destination office addresses could not be found, route %d", route.CarID)
+		return errors.Newf("GeneralRoutesReporter.processShipment()", "destination office addresses could not be found, route %d", route.CarID)
 	}
 
-	shipments, err := r.loadShipments(ctx, route.CarID, officeName)
+	shipments, err := r.loadShipments(ctx, routeID, officeName)
 	if err != nil || len(shipments) == 0 {
-		return errors.Wrap(err, "GeneralRoutesReporter.processShipments()", "failed load shipments")
+		return errors.Wrap(err, "GeneralRoutesReporter.processShipment()", "failed load shipments")
 	}
 
-	r.chReportMetaData.TimeUpdateShipments = time.Now()
-
-	routeData := r.chRouteData[route.CarID]
-	reportData := r.chReportData[route.CarID]
-	if routeData == nil || reportData == nil {
-		return errors.Newf("GeneralRoutesReporter.processShipments()", "failed to retrieve data cache, it's empty")
+	routeData := r.chRouteData[routeID]
+	if routeData == nil {
+		return errors.New("GeneralRoutesReporter.processShipment()", "route data or report data is nil")
 	}
 
 	shipment := r.findLastShipment(shipments)
 	if shipment == nil {
-		return errors.Newf("GeneralRoutesReporter.processShipments()", "failed find last shipment, it's empty")
+		return errors.New("GeneralRoutesReporter.processShipment()", "failed find last shipment")
 	}
 
 	currentShipmentID := shipment.ShipmentID
@@ -302,45 +303,35 @@ func (r *GeneralRoutesReporter) processShipments(ctx context.Context, route *wb_
 	// First process, if there was no data at all previously
 	if prevShipmentID == 0 {
 		routeData.shipmentID = currentShipmentID
-		reportData.ShipmentID = currentShipmentID
-		reportData.ShipmentCreateDate = shipment.CreateDt
-		reportData.ShipmentCloseDate = shipment.CloseDt
-		routeData.isShipmentOpen = shipment.CloseDt.IsZero()
+		routeData.shipmentCreateDate = shipment.CreateDt
+		routeData.shipmentCloseDate = shipment.CloseDt
 		return nil
 	}
 
 	// Subsequent process
 
+	// opened new shipment
 	if currentShipmentID != prevShipmentID {
-		parking, _, err := r.loadParkingAndRemainsBarcodesByRouteInfo(ctx, routesInfo)
-		if err != nil {
-			return errors.Wrapf(err, "GeneralRoutesReporter.processShipments()", "failed load shipment remains barcodes for shipment %d", shipment.ShipmentID)
-		}
 		routeData.shipmentID = currentShipmentID
-		routeData.isShipmentOpen = shipment.CloseDt.IsZero()
-
-		reportData.ShipmentID = currentShipmentID
-		reportData.ShipmentCreateDate = shipment.CreateDt
-		reportData.ShipmentCloseDate = shipment.CloseDt
-		reportData.Parking = parking
-		logger.Logf(logger.INFO, "GeneralRoutesReporter.processShipments()", "open new shipment %d", currentShipmentID)
+		routeData.shipmentCreateDate = shipment.CreateDt
+		routeData.shipmentCloseDate = shipment.CloseDt
+		logger.Logf(logger.INFO, "GeneralRoutesReporter.processShipment()", "open new shipment %d", currentShipmentID)
 		return nil
 	}
 
-	if !shipment.CloseDt.IsZero() && routeData.isShipmentOpen {
-		parking, barcodes, err := r.loadParkingAndRemainsBarcodesByRouteInfo(ctx, routesInfo)
+	// close shipment
+	if !shipment.CloseDt.IsZero() && routeData.shipmentCloseDate.IsZero() {
+		parking, barcodes, err := r.loadParkingAndRemainsBarcodesByRouteInfo(ctx, routeInfo)
 		if err != nil {
-			return errors.Wrapf(err, "GeneralRoutesReporter.processShipments()", "failed load shipment remains barcodes for shipment %d", shipment.ShipmentID)
+			return errors.Wrapf(err, "GeneralRoutesReporter.processShipment()", "failed load parking and remains barcodes for shipment %d", shipment.ShipmentID)
 		}
-		routeData.isShipmentOpen = shipment.CloseDt.IsZero()
-
-		reportData.ShipmentCreateDate = shipment.CreateDt
-		reportData.ShipmentCloseDate = shipment.CloseDt
-		reportData.Parking = parking
-		reportData.RemainsBarcodes = barcodes
+		routeData.parking = parking
+		routeData.shipmentCreateDate = shipment.CreateDt
+		routeData.shipmentCloseDate = shipment.CloseDt
+		routeData.remainsBarcodes = barcodes
 		r.chReportMetaData.TimeRemainsBarcodes = time.Now()
 		r.prompter.PromptCloseShipment(currentShipmentID, barcodes)
-		logger.Logf(logger.INFO, "GeneralRoutesReporter.processShipments()", "close shipment %d", currentShipmentID)
+		logger.Logf(logger.INFO, "GeneralRoutesReporter.processShipment()", "close shipment %d", currentShipmentID)
 	}
 
 	return nil
@@ -349,7 +340,7 @@ func (r *GeneralRoutesReporter) processShipments(ctx context.Context, route *wb_
 func (r *GeneralRoutesReporter) processWaySheets(ctx context.Context, remainsReport *wb_models.RemainsLastMileReport) error {
 	logger.Log(logger.INFO, "GeneralRoutesReporter.processWaySheets()", "start process way sheets")
 
-	err := r.findLastAndPrevWaySheets(ctx)
+	err := r.findWaySheets(ctx)
 	if err != nil {
 		return errors.Wrap(err, "GeneralRoutesReporter.processWaySheets()", "")
 	}
@@ -359,18 +350,14 @@ func (r *GeneralRoutesReporter) processWaySheets(ctx context.Context, remainsRep
 
 		routeData := r.chRouteData[route.CarID]
 		reportData := r.chReportData[route.CarID]
-		if reportData == nil || routeData == nil {
+		if routeData == nil || reportData == nil {
 			continue
 		}
 
-		var lastWaySheet, prevWaySheet *wb_models.WaySheet
-		if routeData.lastOpenWaySheet != nil {
-			lastWaySheet = routeData.lastOpenWaySheet
-			prevWaySheet = routeData.bestClosedWaySheet
-		} else {
-			lastWaySheet = routeData.bestClosedWaySheet
-			prevWaySheet = routeData.prevClosedWaySheet
-		}
+		lastWaySheet := routeData.lastWaySheet
+		prevWaySheet := routeData.prevWaySheet
+		routeData.lastWaySheet = nil
+		routeData.prevWaySheet = nil
 
 		if lastWaySheet != nil {
 			if err = r.processWaySheet(ctx, reportData, atoiSafe(lastWaySheet.WaySheetID), true); err != nil {
@@ -389,63 +376,64 @@ func (r *GeneralRoutesReporter) processWaySheets(ctx context.Context, remainsRep
 		if lastWaySheet != nil && prevWaySheet != nil {
 			reportData.WaySheetsInterval = lastWaySheet.OpenDt.Sub(prevWaySheet.OpenDt)
 		}
-
-		routeData.lastOpenWaySheet = nil
-		routeData.bestClosedWaySheet = nil
-		routeData.prevClosedWaySheet = nil
 	}
 
 	r.chReportMetaData.TimeUpdateWaySheets = time.Now()
 	return nil
 }
 
-func (r *GeneralRoutesReporter) findLastAndPrevWaySheets(ctx context.Context) error {
+func (r *GeneralRoutesReporter) findWaySheets(ctx context.Context) error {
 	waySheets, err := r.loadWaySheets(ctx)
 	if err != nil {
-		return errors.Wrap(err, "GeneralRoutesReporter.findLastAndPrevWaySheets()", "failed load way sheets")
+		return errors.Wrap(err, "GeneralRoutesReporter.findWaySheets()", "failed load way sheets")
 	}
 
 	for _, waySheet := range waySheets {
-		waySheetRouteID := atoiSafe(waySheet.RouteCarID)
+		if waySheet == nil {
+			continue
+		}
 
-		routeData := r.chRouteData[waySheetRouteID]
+		routeID := atoiSafe(waySheet.RouteCarID)
+		routeData := r.chRouteData[routeID]
 		if routeData == nil {
 			continue
 		}
 
-		if waySheet.CloseDt.IsZero() {
-			if routeData.lastOpenWaySheet == nil || waySheet.OpenDt.After(routeData.lastOpenWaySheet.OpenDt) {
-				routeData.lastOpenWaySheet = waySheet
-			}
-			continue
-		}
-
-		if routeData.bestClosedWaySheet == nil {
-			routeData.bestClosedWaySheet = waySheet
-			continue
-		}
-
-		if waySheet.CloseDt.After(routeData.bestClosedWaySheet.CloseDt) {
-			routeData.prevClosedWaySheet = routeData.bestClosedWaySheet
-			routeData.bestClosedWaySheet = waySheet
-			continue
-		}
-
-		if routeData.prevClosedWaySheet == nil || waySheet.CloseDt.After(routeData.prevClosedWaySheet.CloseDt) {
-			routeData.prevClosedWaySheet = waySheet
+		if r.isBetterWaySheet(waySheet, routeData.lastWaySheet) {
+			routeData.prevWaySheet = routeData.lastWaySheet
+			routeData.lastWaySheet = waySheet
+		} else if routeData.lastWaySheet.WaySheetID != waySheet.WaySheetID &&
+			r.isBetterWaySheet(waySheet, routeData.prevWaySheet) {
+			routeData.prevWaySheet = waySheet
 		}
 	}
 
 	return nil
 }
 
-func (r *GeneralRoutesReporter) processWaySheet(ctx context.Context, reportData *reports.GeneralRoutesReportData, waySheetID int, isLast bool) error {
-	if isLast {
-		reportData.WaySheetID = waySheetID
-	} else {
-		reportData.PrevWaySheetID = waySheetID
+func (r *GeneralRoutesReporter) isBetterWaySheet(candidate, current *wb_models.WaySheet) bool {
+	if current == nil {
+		return true
 	}
 
+	candidateOpen := candidate.CloseDt.IsZero()
+	currentOpen := current.CloseDt.IsZero()
+
+	if candidateOpen && !currentOpen {
+		return true
+	}
+	if !candidateOpen && currentOpen {
+		return false
+	}
+
+	if candidateOpen && currentOpen {
+		return candidate.OpenDt.After(current.OpenDt)
+	}
+
+	return candidate.CloseDt.After(current.CloseDt)
+}
+
+func (r *GeneralRoutesReporter) processWaySheet(ctx context.Context, reportData *reports.GeneralRoutesReportData, waySheetID int, isLast bool) error {
 	info, err := r.loadWaySheetInfo(ctx, waySheetID)
 	if err != nil {
 		return errors.Wrapf(err, "GeneralRoutesReporter.processWaySheet()", "failed load last way sheet %d info: %v", waySheetID, err)
@@ -497,12 +485,14 @@ func (r *GeneralRoutesReporter) processWaySheet(ctx context.Context, reportData 
 	}
 
 	if isLast {
+		reportData.WaySheetID = waySheetID
 		reportData.WaySheetTotalAddresses = len(offices)
 		reportData.WaySheetCurrentAddresses = counterDeliveryOffices
 		reportData.WaySheetDateLastOperation = dateLastOperation
 		reportData.WaySheetCurrentReturnedTares = counterCurrentReturnedTares
 		reportData.WaySheetTotalReturnedTares = counterTotalReturnedTares
 	} else {
+		reportData.PrevWaySheetID = waySheetID
 		reportData.PrevWaySheetTotalAddresses = len(offices)
 		reportData.PrevWaySheetCurrentAddresses = counterDeliveryOffices
 		reportData.PrevWaySheetDateLastOperation = dateLastOperation
@@ -513,8 +503,36 @@ func (r *GeneralRoutesReporter) processWaySheet(ctx context.Context, reportData 
 	return nil
 }
 
+func (r *GeneralRoutesReporter) processRating(ctx context.Context) error {
+	logger.Log(logger.INFO, "GeneralRoutesReporter.processRating()", "start process rating")
+
+	jobsScheduling, err := r.loadJobsScheduling(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, route := range jobsScheduling.Route {
+		if route == nil || route.Rating == nil || route.SrcOfficeId != r.officeID {
+			continue
+		}
+
+		reportData := r.chReportData[route.RouteID]
+		if reportData == nil {
+			logger.Logf(logger.WARN, "GeneralRoutesReporter.processRating()", "there is no report data for the route %d", route.RouteID)
+			continue
+		}
+
+		reportData.Rating = float32(route.Rating.OverallRating)
+	}
+	return nil
+}
+
 func (r *GeneralRoutesReporter) isValidRoute(route *wb_models.Route) bool {
 	if route == nil || len(route.Suppliers) == 0 {
+		return false
+	}
+
+	if _, ok := r.skipRoutes[route.CarID]; ok {
 		return false
 	}
 
@@ -529,9 +547,6 @@ func (r *GeneralRoutesReporter) isValidRoute(route *wb_models.Route) bool {
 		return false
 	}
 
-	if _, ok := r.skipRoutes[route.CarID]; ok {
-		return false
-	}
 	return true
 }
 
@@ -559,9 +574,6 @@ func (r *GeneralRoutesReporter) loadRemainsLastMileReport(ctx context.Context) (
 	})
 	if err != nil {
 		return nil, err
-	}
-	if remainsLastMileReport != nil {
-		r.chRemainsLastMileReport = remainsLastMileReport
 	}
 	return remainsLastMileReport, nil
 }
@@ -627,6 +639,21 @@ func (r *GeneralRoutesReporter) loadShipments(ctx context.Context, routeID int, 
 	return shipments, nil
 }
 
+func (r *GeneralRoutesReporter) loadParking(ctx context.Context, routeID int) (int, error) {
+	routeInfo, err := r.loadRemainsLastMileReportInfo(ctx, routeID)
+	if err != nil {
+		return 0, errors.Wrapf(err, "GeneralRoutesReporter.loadParking()", "failed load route info for route %d", routeID)
+	}
+
+	parking, _, err := r.loadParkingAndRemainsBarcodesByRouteInfo(ctx, routeInfo)
+	if err != nil {
+		return 0, errors.Wrapf(err, "GeneralRoutesReporter.loadParking()", "failed load parking for route %d", routeID)
+
+	}
+
+	return parking, nil
+}
+
 func (r *GeneralRoutesReporter) loadParkingAndRemainsBarcodesByRouteInfo(ctx context.Context, info []*wb_models.RemainsLastMileReportsRouteInfo) (int, int, error) {
 	if info == nil || len(info) == 0 {
 		return 0, 0, nil
@@ -674,7 +701,7 @@ func (r *GeneralRoutesReporter) loadRemainsTares(ctx context.Context, dstOfficeI
 }
 
 func (r *GeneralRoutesReporter) loadWaySheets(ctx context.Context) (waySheets []*wb_models.WaySheet, err error) {
-	now := time.Now().In(time.UTC)
+	now := time.Now()
 	for supplierID := range r.suppliers {
 		var page *wb_models.WaySheetsPage
 		err = retryAction(ctx, "GeneralRoutesReporter.loadWaySheets", 3, 1*time.Second, func() error {
@@ -684,7 +711,7 @@ func (r *GeneralRoutesReporter) loadWaySheets(ctx context.Context) (waySheets []
 				SupplierID:  supplierID,
 				SrcOfficeID: r.officeID,
 				Offset:      0,
-				Limit:       500,
+				Limit:       800,
 				WayTypeID:   0,
 			})
 			return err
