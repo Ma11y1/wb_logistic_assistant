@@ -58,10 +58,10 @@ type GeneralRoutesReporter struct {
 	sheetName     string
 	sheetPosition string
 
-	chReportMetaData *reports.GeneralRoutesReportMetaData
-	chReportDataList []*reports.GeneralRoutesReportData
-	chReportData     map[int]*reports.GeneralRoutesReportData // report id -> ReportData
-	chRouteData      map[int]*generalRoutesRouteData          // report id -> RoutesData
+	reportMetaData *reports.GeneralRoutesReportMetaData
+	reportDataList []*reports.GeneralRoutesReportData
+	reportData     map[int]*reports.GeneralRoutesReportData // report id -> ReportData
+	routeData      map[int]*generalRoutesRouteData          // report id -> RoutesData
 }
 
 func NewGeneralRoutesReporter(config *config.Config, storage storage.Storage, services *services.Container, prompter prompters.GeneralRoutesReporterPrompter) *GeneralRoutesReporter {
@@ -93,10 +93,10 @@ func NewGeneralRoutesReporter(config *config.Config, storage storage.Storage, se
 		sheetName:     config.GoogleSheets().ReportSheets().GeneralRoutes().SheetName(),
 		sheetPosition: "A1",
 
-		chReportMetaData: &reports.GeneralRoutesReportMetaData{},
-		chReportDataList: make([]*reports.GeneralRoutesReportData, 0, 10),
-		chReportData:     map[int]*reports.GeneralRoutesReportData{},
-		chRouteData:      map[int]*generalRoutesRouteData{},
+		reportMetaData: &reports.GeneralRoutesReportMetaData{},
+		reportDataList: make([]*reports.GeneralRoutesReportData, 0, 10),
+		reportData:     map[int]*reports.GeneralRoutesReportData{},
+		routeData:      map[int]*generalRoutesRouteData{},
 	}
 }
 
@@ -108,16 +108,10 @@ func (r *GeneralRoutesReporter) Run(ctx context.Context) error {
 	r.prompter.PromptStart()
 
 	now := time.Now()
-	r.chReportDataList = r.chReportDataList[:0]
+	r.reportDataList = r.reportDataList[:0]
 
 	if now.After(r.prevClearCache.Add(r.intervalClearCache)) {
-		r.chReportMetaData = &reports.GeneralRoutesReportMetaData{}
-		clear(r.chReportData)
-		clear(r.chRouteData)
-		r.prevResetChangeBarcodes = time.Time{}
-		r.prevUpdateRating = time.Time{}
-		r.prevUpdateShipments = time.Time{}
-		r.prevUpdateWaySheets = time.Time{}
+		r.resetCache()
 		r.prevClearCache = now
 	}
 
@@ -126,13 +120,24 @@ func (r *GeneralRoutesReporter) Run(ctx context.Context) error {
 		return errors.Wrap(err, "GeneralRoutesReporter.Run()", "failed processing routes")
 	}
 
-	if err = r.sendReport(ctx, r.chReportMetaData, r.chReportDataList); err != nil {
+	if err = r.sendReport(ctx, r.reportMetaData, r.reportDataList); err != nil {
 		r.prompter.PromptError("Failed send report")
 		return errors.Wrap(err, "GeneralRoutesReporter.Run()", "failed send report")
 	}
 
 	r.prompter.PromptFinish(time.Since(now))
 	return nil
+}
+
+func (r *GeneralRoutesReporter) resetCache() {
+	r.reportMetaData = &reports.GeneralRoutesReportMetaData{}
+	clear(r.reportData)
+	clear(r.routeData)
+	r.reportDataList = make([]*reports.GeneralRoutesReportData, 0, 10)
+	r.prevResetChangeBarcodes = time.Time{}
+	r.prevUpdateRating = time.Time{}
+	r.prevUpdateShipments = time.Time{}
+	r.prevUpdateWaySheets = time.Time{}
 }
 
 func (r *GeneralRoutesReporter) processReport(ctx context.Context, now time.Time) error {
@@ -146,7 +151,7 @@ func (r *GeneralRoutesReporter) processReport(ctx context.Context, now time.Time
 
 	isResetChangeBarcodes := now.After(r.prevResetChangeBarcodes.Add(r.intervalResetChangeBarcodes))
 	if isResetChangeBarcodes {
-		r.chReportMetaData.TimeUpdateChangeBarcodes = now
+		r.reportMetaData.TimeUpdateChangeBarcodes = now
 		r.prevResetChangeBarcodes = now
 	}
 
@@ -162,23 +167,22 @@ func (r *GeneralRoutesReporter) processReport(ctx context.Context, now time.Time
 		routeID := route.CarID
 
 		// Data
-		routeData := r.chRouteData[routeID]
+		routeData := r.routeData[routeID]
 		if routeData == nil {
 			routeData = &generalRoutesRouteData{routeID: routeID}
-			r.chRouteData[routeID] = routeData
+			r.routeData[routeID] = routeData
 		}
 
-		reportData := r.chReportData[routeID]
+		reportData := r.reportData[routeID]
 		if reportData == nil {
 			reportData = &reports.GeneralRoutesReportData{RouteID: routeID}
-			r.chReportData[routeID] = reportData
+			r.reportData[routeID] = reportData
 		}
 
-		r.chReportDataList = append(r.chReportDataList, reportData)
+		r.reportDataList = append(r.reportDataList, reportData)
 
 		// First Parking and Sp name. Next updates to the parking and sp name will be when the shipment closes
 		if routeData.parking == 0 {
-			time.Sleep(200 * time.Millisecond)
 			routeData.parking, err = r.loadParking(ctx, routeID)
 			if err != nil {
 				r.prompter.PromptError(fmt.Sprintf("Failed load route info for route %d", routeID))
@@ -228,7 +232,7 @@ func (r *GeneralRoutesReporter) processReport(ctx context.Context, now time.Time
 		logger.Log(logger.INFO, "GeneralRoutesReporter.processReport()", "all shipments updated")
 		r.prompter.PromptUpdateShipments()
 		r.prevUpdateShipments = now
-		r.chReportMetaData.TimeUpdateShipments = now
+		r.reportMetaData.TimeUpdateShipments = now
 	}
 
 	// Way sheets
@@ -252,11 +256,11 @@ func (r *GeneralRoutesReporter) processReport(ctx context.Context, now time.Time
 			r.prompter.PromptUpdateRating()
 			logger.Log(logger.INFO, "GeneralRoutesReporter.processReport()", "rating updated")
 			r.prevUpdateRating = now
-			r.chReportMetaData.TimeUpdateRating = now
+			r.reportMetaData.TimeUpdateRating = now
 		}
 	}
 
-	r.chReportMetaData.Update = time.Now()
+	r.reportMetaData.Update = time.Now()
 	logger.Logf(logger.INFO, "GeneralRoutesReporter.processReport()", "update routes %d", countRoutes)
 	r.prompter.PromptUpdateRoutes(countRoutes)
 
@@ -291,7 +295,7 @@ func (r *GeneralRoutesReporter) processShipment(ctx context.Context, route *wb_m
 		return errors.Wrap(err, "GeneralRoutesReporter.processShipment()", "failed load shipments")
 	}
 
-	routeData := r.chRouteData[routeID]
+	routeData := r.routeData[routeID]
 	if routeData == nil {
 		return errors.New("GeneralRoutesReporter.processShipment()", "route data or report data is nil")
 	}
@@ -333,7 +337,7 @@ func (r *GeneralRoutesReporter) processShipment(ctx context.Context, route *wb_m
 		routeData.shipmentCreateDate = shipment.CreateDt
 		routeData.shipmentCloseDate = shipment.CloseDt
 		routeData.remainsBarcodes = barcodes
-		r.chReportMetaData.TimeRemainsBarcodes = time.Now()
+		r.reportMetaData.TimeRemainsBarcodes = time.Now()
 		r.prompter.PromptCloseShipment(currentShipmentID, barcodes)
 		logger.Logf(logger.INFO, "GeneralRoutesReporter.processShipment()", "close shipment %d", currentShipmentID)
 	}
@@ -342,6 +346,10 @@ func (r *GeneralRoutesReporter) processShipment(ctx context.Context, route *wb_m
 }
 
 func (r *GeneralRoutesReporter) processWaySheets(ctx context.Context, remainsReport *wb_models.RemainsLastMileReport) error {
+	if ctx.Err() != nil {
+		return errors.Wrap(ctx.Err(), "GeneralRoutesReporter.processWaySheets()", "task was preliminarily completed")
+	}
+
 	logger.Log(logger.INFO, "GeneralRoutesReporter.processWaySheets()", "start process way sheets")
 
 	err := r.findWaySheets(ctx)
@@ -352,8 +360,8 @@ func (r *GeneralRoutesReporter) processWaySheets(ctx context.Context, remainsRep
 	for _, route := range remainsReport.Routes {
 		time.Sleep(100 * time.Millisecond)
 
-		routeData := r.chRouteData[route.CarID]
-		reportData := r.chReportData[route.CarID]
+		routeData := r.routeData[route.CarID]
+		reportData := r.reportData[route.CarID]
 		if routeData == nil || reportData == nil {
 			continue
 		}
@@ -382,7 +390,7 @@ func (r *GeneralRoutesReporter) processWaySheets(ctx context.Context, remainsRep
 		}
 	}
 
-	r.chReportMetaData.TimeUpdateWaySheets = time.Now()
+	r.reportMetaData.TimeUpdateWaySheets = time.Now()
 	return nil
 }
 
@@ -398,7 +406,7 @@ func (r *GeneralRoutesReporter) findWaySheets(ctx context.Context) error {
 		}
 
 		routeID := atoiSafe(waySheet.RouteCarID)
-		routeData := r.chRouteData[routeID]
+		routeData := r.routeData[routeID]
 		if routeData == nil {
 			continue
 		}
@@ -406,7 +414,8 @@ func (r *GeneralRoutesReporter) findWaySheets(ctx context.Context) error {
 		if r.isBetterWaySheet(waySheet, routeData.lastWaySheet) {
 			routeData.prevWaySheet = routeData.lastWaySheet
 			routeData.lastWaySheet = waySheet
-		} else if routeData.lastWaySheet.WaySheetID != waySheet.WaySheetID &&
+		} else if routeData.lastWaySheet != nil &&
+			routeData.lastWaySheet.WaySheetID != waySheet.WaySheetID &&
 			r.isBetterWaySheet(waySheet, routeData.prevWaySheet) {
 			routeData.prevWaySheet = waySheet
 		}
@@ -520,7 +529,7 @@ func (r *GeneralRoutesReporter) processRating(ctx context.Context) error {
 			continue
 		}
 
-		reportData := r.chReportData[route.RouteID]
+		reportData := r.reportData[route.RouteID]
 		if reportData == nil {
 			logger.Logf(logger.WARN, "GeneralRoutesReporter.processRating()", "there is no report data for the route %d", route.RouteID)
 			continue
@@ -627,6 +636,9 @@ func (r *GeneralRoutesReporter) loadShipments(ctx context.Context, routeID int, 
 		})
 		if err != nil {
 			logger.Logf(logger.ERROR, "GeneralRoutesReporter.loadShipments()", "failed load shipments on route %d for supplier %d: %v", routeID, supplierID, err)
+			if len(shipments) > 0 {
+				err = nil
+			}
 			continue
 		}
 		if len(res) > 0 {
@@ -723,6 +735,9 @@ func (r *GeneralRoutesReporter) loadWaySheets(ctx context.Context) (waySheets []
 		if page == nil || err != nil {
 			r.prompter.PromptError(fmt.Sprintf("Failed load way sheets for supplier %d", supplierID))
 			logger.Logf(logger.ERROR, "GeneralRoutesReporter.loadWaySheets()", "failed load way sheets for supplier %d: %v", supplierID, err)
+			if len(waySheets) > 0 {
+				err = nil
+			}
 			continue
 		}
 		if len(page.WaySheets) > 0 {

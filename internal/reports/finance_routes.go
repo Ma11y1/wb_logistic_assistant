@@ -18,7 +18,10 @@ type FinanceRoutesReportData struct {
 	ShippedTare        int
 	TotalReturnTare    int
 	CurrentReturnTare  int
+	Mileage            float64
+	IncomeMileage      float64
 	Income             float64
+	IncomeTotal        float64
 	IncomeReturn       float64
 	Fine               float64
 	SalaryRate         float64
@@ -52,7 +55,7 @@ func (r *FinanceRoutesReport) Render(data *FinanceRoutesReportData) (*ReportData
 			{Text: "Отгрузка:", Bold: true, Block: true}, {Text: data.ShipmentID,
 				Link: "https://logistics.wildberries.ru/external-logistics/shipments-shell/shipments/" + data.ShipmentID},
 			{Text: "Путевой лист:", Bold: true, Block: true}, {Text: data.WaySheetID,
-				Link: "https://logistics.wildberries.ru/external-logistics/waysheet-registry/LML/" + data.WaySheetID},
+				Link: "https://ol.wildberries.ru/#/layout/external-waysheet/" + data.WaySheetID},
 			{Text: "Дата погрузки:", Bold: true, Block: true}, {Text: data.DateOpen.Format("02.01.2006")},
 			{Text: "Время открытия:", Bold: true, Block: true}, {Text: data.DateOpen.Format("15:04")},
 			{Text: "Водитель:", Bold: true, Block: true}, {Text: data.DriverName},
@@ -60,9 +63,12 @@ func (r *FinanceRoutesReport) Render(data *FinanceRoutesReportData) (*ReportData
 			{Text: "Отгружено ШК:", Bold: true, Block: true}, {Text: itoa(data.ShippedBarcodes)},
 			{Text: "Отгружено тар:", Bold: true, Block: true}, {Text: itoa(data.ShippedTare)},
 			{Text: "Возвраты:", Bold: true, Block: true}, {Text: fmt.Sprintf("%d/%d", data.CurrentReturnTare, data.TotalReturnTare)},
+			{Text: "Километраж:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.1f км", data.Mileage)},
+			{Text: "Стоимость км:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р.", data.IncomeMileage)},
 			{Text: "Задание:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р.", data.Income)},
 			{Text: "Возврат:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р.", data.IncomeReturn)},
 			{Text: "Штраф:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р.", data.Fine)},
+			{Text: "Задание итого:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р.", data.IncomeTotal)},
 			{Text: "Брак:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f (%.2f%%)", data.Marriage, data.PercentMarriage)},
 			{Text: "Налог:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f (%.2f%%)", data.Tax, data.PercentTax)},
 			{Text: "Ставка:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р.", data.SalaryRate)},

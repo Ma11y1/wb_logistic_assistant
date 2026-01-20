@@ -55,7 +55,7 @@ func (r *ShipmentCloseReport) Render(data *ShipmentCloseReportData) (*ReportData
 			{Text: "Отгрузка:", Bold: true, Block: true}, {Text: strconv.Itoa(data.ShipmentID),
 				Link: "https://logistics.wildberries.ru/external-logistics/shipments-shell/shipments/" + strconv.Itoa(data.ShipmentID)},
 			{Text: "Путевой лист:", Bold: true, Block: true}, {Text: strconv.Itoa(data.WaySheetID),
-				Link: "https://logistics.wildberries.ru/external-logistics/waysheet-registry/LML/" + strconv.Itoa(data.WaySheetID)},
+				Link: "https://ol.wildberries.ru/#/layout/external-waysheet/" + strconv.Itoa(data.WaySheetID)},
 			{Text: "Дата погрузки:", Bold: true, Block: true}, {Text: data.Date.Format("02.01.2006")},
 			{Text: "Время открытия:", Bold: true, Block: true}, {Text: data.DateCreate.Format("15:04")},
 			{Text: "Время закрытия:", Bold: true, Block: true}, {Text: data.DateClose.Format("15:04")},

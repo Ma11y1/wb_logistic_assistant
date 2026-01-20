@@ -3,14 +3,15 @@ package auth
 import (
 	"context"
 	"fmt"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
-	"google.golang.org/api/option"
-	"google.golang.org/api/sheets/v4"
 	"net/http"
 	"strings"
 	"sync"
 	models2 "wb_logistic_assistant/external/google_sheets_api/models"
+
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/option"
+	"google.golang.org/api/sheets/v4"
 )
 
 //// Test applications receive a refresh token for 7 days only
@@ -49,7 +50,7 @@ func (a *OAuthActor) AuthCodeURL(credential *models2.OAuthCredentials, scope Sco
 
 	return config.AuthCodeURL(state,
 		oauth2.AccessTypeOffline,
-		oauth2.SetAuthURLParam("prompters", "consent"),
+		oauth2.SetAuthURLParam("prompt", "consent"),
 	), nil
 }
 

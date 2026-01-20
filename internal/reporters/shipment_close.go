@@ -43,7 +43,7 @@ type ShipmentCloseReporter struct {
 	sheetName     string
 	sheetPosition string
 
-	chOpenedShipments map[int]int // shipment id -> route id
+	openedShipments map[int]int // shipment id -> route id
 }
 
 func NewShipmentCloseReporter(config *config.Config, storage storage.Storage, service *services.Container, prompter prompters.ShipmentCloseReporterPrompter) *ShipmentCloseReporter {
@@ -71,7 +71,7 @@ func NewShipmentCloseReporter(config *config.Config, storage storage.Storage, se
 		sheetName:     config.GoogleSheets().ReportSheets().GeneralRoutes().SheetName(),
 		sheetPosition: "A1",
 
-		chOpenedShipments: map[int]int{},
+		openedShipments: map[int]int{},
 	}
 }
 
@@ -150,9 +150,9 @@ func (r *ShipmentCloseReporter) findOpenedShipments(ctx context.Context) error {
 			if !shipment.CloseDt.IsZero() {
 				continue
 			}
-			r.chOpenedShipments[shipment.ShipmentID] = routeID
-			r.prompter.PromptShipmentOpened(routeID, shipment.ShipmentID, len(r.chOpenedShipments))
-			logger.Logf(logger.INFO, "ShipmentCloseReporter.findOpenedShipments()", "open shipment: route %d, shipment %d. Cache size opened shipments: %d", routeID, shipment.ShipmentID, len(r.chOpenedShipments))
+			r.openedShipments[shipment.ShipmentID] = routeID
+			r.prompter.PromptShipmentOpened(routeID, shipment.ShipmentID, len(r.openedShipments))
+			logger.Logf(logger.INFO, "ShipmentCloseReporter.findOpenedShipments()", "open shipment: route %d, shipment %d. Cache size opened shipments: %d", routeID, shipment.ShipmentID, len(r.openedShipments))
 		}
 	}
 	return nil
@@ -161,13 +161,13 @@ func (r *ShipmentCloseReporter) findOpenedShipments(ctx context.Context) error {
 func (r *ShipmentCloseReporter) processOpenedShipments(ctx context.Context) error {
 	logger.Log(logger.INFO, "ShipmentCloseReporter.processOpenedShipments()", "start process opened shipments")
 
-	for shipmentID, routeID := range r.chOpenedShipments {
+	for shipmentID, routeID := range r.openedShipments {
 		time.Sleep(100 * time.Millisecond)
 
 		info, err := r.loadShipmentInfo(ctx, shipmentID)
 		if err != nil {
 			r.prompter.PromptError(fmt.Sprintf("Failed loading shipment info for shipment %d", shipmentID))
-			delete(r.chOpenedShipments, shipmentID)
+			delete(r.openedShipments, shipmentID)
 			logger.Logf(logger.ERROR, "ShipmentCloseReporter.processOpenedShipments()", "failed load shipment info, route %d, shipment %d: %v", routeID, shipmentID, err)
 			continue
 		}
@@ -255,7 +255,7 @@ func (r *ShipmentCloseReporter) processOpenedShipments(ctx context.Context) erro
 				logger.Logf(logger.ERROR, "ShipmentCloseReporter.processOpenedShipments()", "failed send report on route %d, shipment %d: %v", routeID, shipmentID, err)
 				continue
 			}
-			delete(r.chOpenedShipments, shipmentID)
+			delete(r.openedShipments, shipmentID)
 		}
 	}
 	return nil

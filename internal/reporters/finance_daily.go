@@ -72,7 +72,7 @@ type FinanceDailyReporter struct {
 	timeLastRender          time.Time
 	isRender                bool
 
-	chData map[int]*FinanceDailyReporterData
+	data map[int]*FinanceDailyReporterData
 }
 
 func NewFinanceDailyReporter(config *config.Config, storage storage.Storage, service *services.Container, prompter prompters.FinanceDailyReporterPrompter) *FinanceDailyReporter {
@@ -106,7 +106,7 @@ func NewFinanceDailyReporter(config *config.Config, storage storage.Storage, ser
 		dayOffset:         config.Reports().FinanceDaily().DayOffset(),
 		isRender:          config.Reports().FinanceDaily().RenderAtStart(),
 
-		chData: map[int]*FinanceDailyReporterData{},
+		data: map[int]*FinanceDailyReporterData{},
 	}
 }
 
@@ -166,7 +166,7 @@ func (r *FinanceDailyReporter) processWaySheets(ctx context.Context) error {
 		return errors.Wrap(err, "FinanceDailyReporter.processWaySheets()", "failed process way sheets")
 	}
 
-	clear(r.chData)
+	clear(r.data)
 
 	targetClosed := 0
 	targetOpened := 0
@@ -185,10 +185,10 @@ func (r *FinanceDailyReporter) processWaySheets(ctx context.Context) error {
 		}
 
 		routeID := atoiSafe(waySheet.RouteCarID)
-		data, ok := r.chData[routeID]
+		data, ok := r.data[routeID]
 		if !ok {
 			data = &FinanceDailyReporterData{DateStart: timeStart, DateEnd: timeEnd, RouteID: routeID}
-			r.chData[routeID] = data
+			r.data[routeID] = data
 
 			time.Sleep(200 * time.Millisecond)
 			waySheetID := atoiSafe(waySheet.WaySheetID)
@@ -271,9 +271,9 @@ func (r *FinanceDailyReporter) processReports(ctx context.Context) error {
 	var income, incomeReturn, fine, salaryRate, extendedSalaryRate, tax, marriage, margin float64
 	var openedWaySheets []string
 
-	for routeID, data := range r.chData {
+	for routeID, data := range r.data {
 		if data == nil {
-			delete(r.chData, routeID)
+			delete(r.data, routeID)
 			continue
 		}
 

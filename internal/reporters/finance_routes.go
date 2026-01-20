@@ -39,7 +39,7 @@ type FinanceRoutesReporter struct {
 	percentMarriage   float64
 	marriageRate      float64
 
-	chOpenedWaySheets map[string]*wb_models.WaySheet // way sheet id -> way sheet
+	openedWaySheets map[string]*wb_models.WaySheet // way sheet id -> way sheet
 }
 
 func NewFinanceRoutesReporter(config *config.Config, storage storage.Storage, service *services.Container, prompter prompters.FinanceRoutesReporterPrompter) *FinanceRoutesReporter {
@@ -65,7 +65,7 @@ func NewFinanceRoutesReporter(config *config.Config, storage storage.Storage, se
 		percentMarriage:   config.Logistic().Office().PercentMarriage(),
 		marriageRate:      config.Logistic().Office().PercentMarriage() / 100,
 
-		chOpenedWaySheets: map[string]*wb_models.WaySheet{},
+		openedWaySheets: map[string]*wb_models.WaySheet{},
 	}
 }
 
@@ -108,23 +108,23 @@ func (r *FinanceRoutesReporter) findOpenedWaySheets(ctx context.Context) error {
 		if waySheet == nil {
 			continue
 		}
-		_, ok := r.chOpenedWaySheets[waySheet.WaySheetID]
+		_, ok := r.openedWaySheets[waySheet.WaySheetID]
 		if !ok && !waySheet.CloseDt.IsZero() {
 			continue
 		}
 		if r.isValidSupplier(atoiSafe(waySheet.SupplierID)) {
-			r.chOpenedWaySheets[waySheet.WaySheetID] = waySheet
+			r.openedWaySheets[waySheet.WaySheetID] = waySheet
 		}
 	}
 
-	r.prompter.PromptCountWaySheet(len(r.chOpenedWaySheets))
-	logger.Logf(logger.INFO, "FinanceRoutesReporter.findOpenedWaySheets()", "opened way sheets: %d", len(r.chOpenedWaySheets))
+	r.prompter.PromptCountWaySheet(len(r.openedWaySheets))
+	logger.Logf(logger.INFO, "FinanceRoutesReporter.findOpenedWaySheets()", "opened way sheets: %d", len(r.openedWaySheets))
 
 	return nil
 }
 
 func (r *FinanceRoutesReporter) processOpenedWaySheets(ctx context.Context) error {
-	for id, waySheet := range r.chOpenedWaySheets {
+	for id, waySheet := range r.openedWaySheets {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -188,11 +188,13 @@ func (r *FinanceRoutesReporter) processOpenedWaySheets(ctx context.Context) erro
 				logger.Logf(logger.ERROR, "FinanceRoutesReporter.processOpenedWaySheets()", "there is no salary rate data for the route %d, way sheet %d", routeID, waySheetID)
 			}
 
-			totalPriceSubFine := waySheet.TotalPrice - waySheet.SumFine
-			marriage := totalPriceSubFine * r.marriageRate
-			tax := (totalPriceSubFine - marriage) * r.taxRate
+			incomeTotal := waySheet.TotalPrice - waySheet.SumFine
+			marriage := incomeTotal * r.marriageRate
+			tax := (incomeTotal - marriage) * r.taxRate
 			extendedSalaryRate := salaryRate + marriage + tax
-			margin := totalPriceSubFine - (salaryRate + marriage + tax)
+			margin := incomeTotal - (salaryRate + marriage + tax)
+			mileage := atofSafe(info.PlanMileage)
+			incomeMileage := incomeTotal / mileage
 
 			r.prompter.PromptCloseWaySheet(routeID, waySheet.WaySheetID, shipmentID)
 			logger.Logf(logger.INFO, "FinanceRoutesReporter.processOpenedWaySheets()", "way sheet %d is closed on route %d, shipment %s", waySheetID, routeID, shipmentID)
@@ -208,9 +210,12 @@ func (r *FinanceRoutesReporter) processOpenedWaySheets(ctx context.Context) erro
 				ShippedTare:        len(info.Tares),
 				TotalReturnTare:    totalReturnTare,
 				CurrentReturnTare:  currentReturnTare,
+				Mileage:            mileage,
+				IncomeMileage:      incomeMileage,
 				Income:             waySheet.TotalPrice,
-				IncomeReturn:       waySheet.SumReturn,
+				IncomeTotal:        incomeTotal,
 				Fine:               waySheet.SumFine,
+				IncomeReturn:       waySheet.SumReturn,
 				SalaryRate:         salaryRate,
 				ExtendedSalaryRate: extendedSalaryRate,
 				Marriage:           marriage,
@@ -224,7 +229,7 @@ func (r *FinanceRoutesReporter) processOpenedWaySheets(ctx context.Context) erro
 				logger.Logf(logger.ERROR, "FinanceRoutesReporter.processOpenedWaySheets()", "failed send report, route %d, shipment: %s, way sheet: %d: %v", routeID, shipmentID, waySheetID, err)
 				continue
 			}
-			delete(r.chOpenedWaySheets, id)
+			delete(r.openedWaySheets, id)
 		}
 	}
 
