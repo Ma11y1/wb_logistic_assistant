@@ -58,7 +58,7 @@
       "suppliers": [194009],
       "skip_routes": [9782,30221,30661,32397,36098,29281],
       "percent_tax": 5,
-      "percent_marriage": 9,
+      "percent_defect": 9,
       "expenses": 2145000,
       "expenses_period": 15,
       "salary_rate_percent": {

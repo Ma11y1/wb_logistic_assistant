@@ -106,7 +106,7 @@ type LogisticOffice struct {
 	salaryRatePercentTemp map[string]float64
 	salaryRateTemp        map[string]float64
 	percentTax            float64 // ro
-	percentMarriage       float64 // ro
+	percentDefect         float64 // ro
 	expenses              float64 // ro
 	expensesPeriod        int     // ro
 }
@@ -118,7 +118,7 @@ type logisticOffice struct {
 	SalaryRatePercent map[string]float64 `json:"salary_rate_percent"`
 	SalaryRate        map[string]float64 `json:"salary_rate"`
 	PercentTax        float64            `json:"percent_tax"`
-	PercentMarriage   float64            `json:"percent_marriage"`
+	PercentDefect     float64            `json:"percent_defect"`
 	Expenses          float64            `json:"expenses"`
 	ExpensesPeriod    int                `json:"expenses_period"`
 }
@@ -133,7 +133,7 @@ func newLogisticOffice() *LogisticOffice {
 		salaryRatePercent: map[int]float64{},  // default
 		salaryRate:        map[int]float64{},  // default
 		percentTax:        0,                  // default
-		percentMarriage:   0,                  // default
+		percentDefect:     0,                  // default
 		expenses:          0,                  //default
 		expensesPeriod:    0,                  // default
 	}
@@ -150,7 +150,7 @@ func (l *LogisticOffice) SkipRoutesMap() map[int]struct{} { return l.skipRoutesM
 func (l *LogisticOffice) SalaryRatePercent() map[int]float64 { return l.salaryRatePercent }
 func (l *LogisticOffice) SalaryRate() map[int]float64        { return l.salaryRate }
 func (l *LogisticOffice) PercentTax() float64                { return l.percentTax }
-func (l *LogisticOffice) PercentMarriage() float64           { return l.percentMarriage }
+func (l *LogisticOffice) PercentDefect() float64             { return l.percentDefect }
 
 func (l *LogisticOffice) Expenses() float64   { return l.expenses }
 func (l *LogisticOffice) ExpensesPeriod() int { return l.expensesPeriod }
@@ -167,7 +167,7 @@ func (l *LogisticOffice) UnmarshalJSON(b []byte) error {
 	l.skipRoutes = temp.SkipRoutes
 	l.skipRoutesMap = sliceToSetInt(temp.SkipRoutes)
 	l.percentTax = temp.PercentTax
-	l.percentMarriage = temp.PercentMarriage
+	l.percentDefect = temp.PercentDefect
 	l.expenses = temp.Expenses
 	l.expensesPeriod = temp.ExpensesPeriod
 	l.salaryRatePercentTemp = temp.SalaryRatePercent
@@ -196,7 +196,7 @@ func (l *LogisticOffice) MarshalJSON() ([]byte, error) {
 		SalaryRatePercent: l.salaryRatePercentTemp,
 		SalaryRate:        l.salaryRateTemp,
 		PercentTax:        l.percentTax,
-		PercentMarriage:   l.percentMarriage,
+		PercentDefect:     l.percentDefect,
 		Expenses:          l.expenses,
 		ExpensesPeriod:    l.expensesPeriod,
 	})

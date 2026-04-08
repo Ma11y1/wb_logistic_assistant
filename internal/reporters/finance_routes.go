@@ -36,9 +36,11 @@ type FinanceRoutesReporter struct {
 	salaryRate        map[int]float64  // route id -> salary rate
 	percentTax        float64
 	taxRate           float64
-	percentMarriage   float64
-	marriageRate      float64
+	percentDefect     float64
+	defectRate        float64
+	delayDuration     time.Duration
 
+	delayTimeMap    map[string]time.Time
 	openedWaySheets map[string]*wb_models.WaySheet // way sheet id -> way sheet
 }
 
@@ -62,10 +64,12 @@ func NewFinanceRoutesReporter(config *config.Config, storage storage.Storage, se
 		salaryRate:        config.Logistic().Office().SalaryRate(),
 		percentTax:        config.Logistic().Office().PercentTax(),
 		taxRate:           config.Logistic().Office().PercentTax() / 100,
-		percentMarriage:   config.Logistic().Office().PercentMarriage(),
-		marriageRate:      config.Logistic().Office().PercentMarriage() / 100,
+		percentDefect:     config.Logistic().Office().PercentDefect(),
+		defectRate:        config.Logistic().Office().PercentDefect() / 100,
+		delayDuration:     10 * time.Minute,
 
-		openedWaySheets: map[string]*wb_models.WaySheet{},
+		delayTimeMap:    make(map[string]time.Time),
+		openedWaySheets: make(map[string]*wb_models.WaySheet),
 	}
 }
 
@@ -124,17 +128,22 @@ func (r *FinanceRoutesReporter) findOpenedWaySheets(ctx context.Context) error {
 }
 
 func (r *FinanceRoutesReporter) processOpenedWaySheets(ctx context.Context) error {
+	now := time.Now()
 	for id, waySheet := range r.openedWaySheets {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
 
-		if waySheet.TotalPrice == 0 {
-			// financial data may appear with a delay, skips if it has not yet appeared
-			continue
-		}
-
 		if !waySheet.CloseDt.IsZero() {
+			delay, ok := r.delayTimeMap[id]
+			if !ok {
+				r.delayTimeMap[id] = now.Add(r.delayDuration)
+				continue
+			} else if now.Before(delay) || waySheet.TotalPrice == 0 { // financial data may appear with a delay, skips if it has not yet appeared
+				continue
+			}
+			delete(r.delayTimeMap, id)
+
 			waySheetID := atoiSafe(id)
 			info, err := r.loadWaySheetInfo(ctx, waySheetID)
 			if err != nil {
@@ -165,6 +174,13 @@ func (r *FinanceRoutesReporter) processOpenedWaySheets(ctx context.Context) erro
 				}
 			}
 
+			shippedTare := 0
+			for _, tare := range info.Tares {
+				if tare != nil && tare.CountBarcodes != 0 {
+					shippedTare++
+				}
+			}
+
 			var totalReturnTare, currentReturnTare int
 			for _, tare := range info.Tares {
 				if tare == nil {
@@ -189,10 +205,10 @@ func (r *FinanceRoutesReporter) processOpenedWaySheets(ctx context.Context) erro
 			}
 
 			incomeTotal := waySheet.TotalPrice - waySheet.SumFine
-			marriage := incomeTotal * r.marriageRate
-			tax := (incomeTotal - marriage) * r.taxRate
-			extendedSalaryRate := salaryRate + marriage + tax
-			margin := incomeTotal - (salaryRate + marriage + tax)
+			defect := incomeTotal * r.defectRate
+			tax := (incomeTotal - defect) * r.taxRate
+			extendedSalaryRate := salaryRate + defect + tax
+			margin := incomeTotal - (salaryRate + defect + tax)
 			mileage := atofSafe(info.PlanMileage)
 			incomeMileage := incomeTotal / mileage
 
@@ -207,7 +223,7 @@ func (r *FinanceRoutesReporter) processOpenedWaySheets(ctx context.Context) erro
 				DriverName:         driverName,
 				VehicleNumberPlate: info.Vehicles.ShippingCarNumber,
 				ShippedBarcodes:    info.TotalBarcodesCount,
-				ShippedTare:        len(info.Tares),
+				ShippedTare:        shippedTare,
 				TotalReturnTare:    totalReturnTare,
 				CurrentReturnTare:  currentReturnTare,
 				Mileage:            mileage,
@@ -218,8 +234,8 @@ func (r *FinanceRoutesReporter) processOpenedWaySheets(ctx context.Context) erro
 				IncomeReturn:       waySheet.SumReturn,
 				SalaryRate:         salaryRate,
 				ExtendedSalaryRate: extendedSalaryRate,
-				Marriage:           marriage,
-				PercentMarriage:    r.percentMarriage,
+				Defect:             defect,
+				PercentDefect:      r.percentDefect,
 				Tax:                tax,
 				PercentTax:         r.percentTax,
 				Margin:             margin,

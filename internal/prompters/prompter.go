@@ -14,6 +14,7 @@ type InitializeWBLogisticPrompter interface {
 	PromptWBLogisticQuestionAuthNewUser() bool
 	PromptWBLogisticRequestAuthLogin() string
 	PromptWBLogisticInvalidAuthLogin()
+	PromptWBLogisticRequestAuthCodeFailed(err string)
 	PromptWBLogisticRequestAuthCode(method string, time int) int
 	PromptWBLogisticInvalidAuthCode()
 	PromptWBLogisticRequestAccessTokenData() string

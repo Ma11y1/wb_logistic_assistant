@@ -72,15 +72,39 @@ func SpNameToGateParking(s string) (gate, parking int) {
 			continue
 		}
 
-		// "буфер"
+		// "буфер" "Буфер"
 		if i+10 <= n &&
-			b[i] == 0xD0 && b[i+1] == 0xB1 &&
+			(b[i] == 0xD0 && b[i+1] == 0x91 || b[i] == 0xD0 && b[i+1] == 0xB1) &&
 			b[i+2] == 0xD1 && b[i+3] == 0x83 &&
 			b[i+4] == 0xD1 && b[i+5] == 0x84 &&
 			b[i+6] == 0xD0 && b[i+7] == 0xB5 &&
 			b[i+8] == 0xD1 && b[i+9] == 0x80 {
 
 			i += 10
+			parking = 0
+			for i < n && b[i] == ' ' {
+				i++
+			}
+
+			for i < n && b[i] >= '0' && b[i] <= '9' {
+				parking = parking*10 + int(b[i]-'0')
+				i++
+			}
+			continue
+		}
+
+		// "парковка" "Парковка"
+		if i+18 <= n &&
+			((b[i] == 0xD0 && b[i+1] == 0x9F) || (b[i] == 0xD0 && b[i+1] == 0xBF)) && // П / п
+			b[i+2] == 0xD0 && b[i+3] == 0xB0 && // а
+			b[i+4] == 0xD1 && b[i+5] == 0x80 && // р
+			b[i+6] == 0xD0 && b[i+7] == 0xBA && // к
+			b[i+8] == 0xD0 && b[i+9] == 0xBE && // о
+			b[i+10] == 0xD0 && b[i+11] == 0xB2 && // в
+			b[i+12] == 0xD0 && b[i+13] == 0xBA && // к
+			b[i+14] == 0xD0 && b[i+15] == 0xB0 { // а
+
+			i += 16
 			parking = 0
 			for i < n && b[i] == ' ' {
 				i++

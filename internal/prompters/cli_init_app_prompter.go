@@ -100,6 +100,10 @@ func (p *CLIInitAppPrompter) PromptWBLogisticInvalidAuthLogin() {
 	fmt.Println("Введен невалидный логин. Пример: 79991112233")
 }
 
+func (p *CLIInitAppPrompter) PromptWBLogisticRequestAuthCodeFailed(err string) {
+	fmt.Printf("Неудалось получить код доступа: %s\n", err)
+}
+
 func (p *CLIInitAppPrompter) PromptWBLogisticRequestAuthCode(method string, time int) int {
 	fmt.Printf("Вам отправлено %s уведомление с кодом. Повторная отправка через %d сек!\n", method, time)
 

@@ -34,8 +34,8 @@ type FinanceDailyReporterData struct {
 	TotalSalaryRate    float64
 	SalaryRate         float64
 	ExtendedSalaryRate float64
-	Marriage           float64
-	PercentMarriage    float64
+	Defect             float64
+	PercentDefect      float64
 	Tax                float64
 	PercentTax         float64
 	Margin             float64
@@ -66,8 +66,8 @@ type FinanceDailyReporter struct {
 	salaryRate              map[int]float64 // route id -> salary rate
 	percentTax              float64
 	taxRate                 float64
-	percentMarriage         float64
-	marriageRate            float64
+	percentDefect           float64
+	defectRate              float64
 	expensesDaily           float64
 	timeLastRender          time.Time
 	isRender                bool
@@ -100,8 +100,8 @@ func NewFinanceDailyReporter(config *config.Config, storage storage.Storage, ser
 		salaryRate:        config.Logistic().Office().SalaryRate(),
 		percentTax:        config.Logistic().Office().PercentTax(),
 		taxRate:           config.Logistic().Office().PercentTax() / 100,
-		percentMarriage:   config.Logistic().Office().PercentMarriage(),
-		marriageRate:      config.Logistic().Office().PercentMarriage() / 100,
+		percentDefect:     config.Logistic().Office().PercentDefect(),
+		defectRate:        config.Logistic().Office().PercentDefect() / 100,
 		expensesDaily:     expensesDaily,
 		dayOffset:         config.Reports().FinanceDaily().DayOffset(),
 		isRender:          config.Reports().FinanceDaily().RenderAtStart(),
@@ -238,19 +238,19 @@ func (r *FinanceDailyReporter) processWaySheets(ctx context.Context) error {
 		}
 
 		totalPriceSubFine := waySheet.TotalPrice - waySheet.SumFine
-		marriage := totalPriceSubFine * r.marriageRate
-		tax := (totalPriceSubFine - marriage) * r.taxRate
+		defect := totalPriceSubFine * r.defectRate
+		tax := (totalPriceSubFine - defect) * r.taxRate
 
 		data.Income += waySheet.TotalPrice
 		data.IncomeReturn += waySheet.SumReturn
 		data.Fine += waySheet.SumFine
 		data.TotalSalaryRate += salaryRate
-		data.ExtendedSalaryRate += salaryRate + marriage + tax
-		data.Marriage += marriage
-		data.PercentMarriage = r.percentMarriage
+		data.ExtendedSalaryRate += salaryRate + defect + tax
+		data.Defect += defect
+		data.PercentDefect = r.percentDefect
 		data.Tax += tax
 		data.PercentTax = r.percentTax
-		data.Margin += totalPriceSubFine - (salaryRate + marriage + tax)
+		data.Margin += totalPriceSubFine - (salaryRate + defect + tax)
 		data.WaySheetIDs = append(data.WaySheetIDs, waySheet.WaySheetID)
 	}
 
@@ -268,7 +268,7 @@ func (r *FinanceDailyReporter) processReports(ctx context.Context) error {
 
 	var dateStart, dateEnd time.Time
 	var flights, openedFlights, shippedBarcodes, shippedTare, tare, returnedTare int
-	var income, incomeReturn, fine, salaryRate, extendedSalaryRate, tax, marriage, margin float64
+	var income, incomeReturn, fine, salaryRate, extendedSalaryRate, tax, defect, margin float64
 	var openedWaySheets []string
 
 	for routeID, data := range r.data {
@@ -291,7 +291,7 @@ func (r *FinanceDailyReporter) processReports(ctx context.Context) error {
 		salaryRate += data.TotalSalaryRate
 		extendedSalaryRate += data.ExtendedSalaryRate
 		tax += data.Tax
-		marriage += data.Marriage
+		defect += data.Defect
 		margin += data.Margin
 
 		if len(data.OpenedWaySheetIDs) > 0 {
@@ -313,8 +313,8 @@ func (r *FinanceDailyReporter) processReports(ctx context.Context) error {
 			TotalSalaryRate:    data.TotalSalaryRate,
 			SalaryRate:         data.SalaryRate,
 			ExtendedSalaryRate: data.ExtendedSalaryRate,
-			Marriage:           data.Marriage,
-			PercentMarriage:    data.PercentMarriage,
+			Defect:             data.Defect,
+			PercentDefect:      data.PercentDefect,
 			Tax:                data.Tax,
 			PercentTax:         data.PercentTax,
 			Margin:             data.Margin,
@@ -354,8 +354,8 @@ func (r *FinanceDailyReporter) processReports(ctx context.Context) error {
 		Fine:               fine,
 		SalaryRate:         salaryRate,
 		ExtendedSalaryRate: extendedSalaryRate,
-		Marriage:           marriage,
-		PercentMarriage:    r.percentMarriage,
+		Defect:             defect,
+		PercentDefect:      r.percentDefect,
 		Tax:                tax,
 		PercentTax:         r.percentTax,
 		Margin:             margin,

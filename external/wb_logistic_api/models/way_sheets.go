@@ -45,7 +45,7 @@ type WaySheetInfo struct {
 	ID                 string                       `json:"way_sheet_id"`
 	WayTypeID          int                          `json:"way_type_id"`
 	TotalBarcodesCount int                          `json:"total_shk_count"`
-	TotalVolumeCount   int                          `json:"total_volume_count"`
+	TotalVolumeCount   float64                      `json:"total_volume_count"`
 	DateOpen           time.Time                    `json:"date_open"`
 	DateClose          time.Time                    `json:"date_close"`
 	PlanMileage        string                       `json:"plan_mileage"`

@@ -31,17 +31,25 @@ mainLoop:
 	for {
 		resCodeData, err := client.RequestAuthCode(context.Background(), login)
 		if err != nil {
-			return nil, errors.Wrap(err, "Initializer.AuthSession()", "failed to request auth code")
+			i.prompter.PromptWBLogisticRequestAuthCodeFailed(err.Error())
 		}
 
 		code := 0
-		timeWaiting = time.Now().Add(time.Duration(resCodeData.Ttl) * time.Second)
+		if resCodeData != nil {
+			timeWaiting = time.Now().Add(time.Duration(resCodeData.Ttl) * time.Second)
+		} else {
+			timeWaiting = time.Now().Add(60 * time.Second)
+		}
 		for {
 			timeRemains := int(timeWaiting.Sub(time.Now()).Seconds())
 			if timeRemains < 0 {
 				timeRemains = 0
 			}
-			code = i.prompter.PromptWBLogisticRequestAuthCode(resCodeData.AuthMethod, timeRemains)
+			if resCodeData != nil {
+				code = i.prompter.PromptWBLogisticRequestAuthCode(resCodeData.AuthMethod, timeRemains)
+			} else {
+				code = i.prompter.PromptWBLogisticRequestAuthCode("", timeRemains)
+			}
 
 			switch code {
 			case RepeatCodeRequest:
@@ -121,7 +129,7 @@ mainLoop:
 func (i *Initializer) getLogin() (string, error) {
 	for attempt := 0; attempt < 3; attempt++ {
 		login := i.prompter.PromptWBLogisticRequestAuthLogin()
-		if len(login) > 10 {
+		if len(login) >= 10 {
 			if login[0] == '+' {
 				login = login[1:]
 			}
@@ -145,6 +153,7 @@ func (i *Initializer) getManualAccessToken() (*wb_models.AuthAccessToken, error)
 	}
 
 	accessToken := &wb_models.AuthAccessToken{}
+
 	err := json.Unmarshal([]byte(token), accessToken)
 	if err != nil {
 		return nil, errors.Wrap(err, "Initializer.getManualAccessToken()", "invalid format data access token")

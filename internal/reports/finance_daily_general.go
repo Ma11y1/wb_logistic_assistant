@@ -20,8 +20,8 @@ type FinanceDailyGeneralReportData struct {
 	Fine               float64
 	SalaryRate         float64
 	ExtendedSalaryRate float64
-	Marriage           float64
-	PercentMarriage    float64
+	Defect             float64
+	PercentDefect      float64
 	Tax                float64
 	PercentTax         float64
 	Margin             float64
@@ -60,7 +60,7 @@ func (r *FinanceDailyGeneralReport) Render(data *FinanceDailyGeneralReportData) 
 			{Text: "Задание:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р.", data.Income)},
 			{Text: "Возврат:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р.", data.IncomeReturn)},
 			{Text: "Штраф:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р.", data.Fine)},
-			{Text: "Брак:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р. (%.2f%%)", data.Marriage, data.PercentMarriage)},
+			{Text: "Брак:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р. (%.2f%%)", data.Defect, data.PercentDefect)},
 			{Text: "Налог:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р. (%.2f%%)", data.Tax, data.PercentTax)},
 			{Text: "Ставка:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р.", data.SalaryRate)},
 			{Text: "Ставка+:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р.", data.ExtendedSalaryRate)},
