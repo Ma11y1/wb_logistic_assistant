@@ -129,7 +129,7 @@ func (s *AuthService) GetUserInfo(ctx context.Context, sessionToken string) (*mo
 	if err != nil {
 		return nil, fmt.Errorf("failed get user info by user ID %d: %w", decodedToken.FreelancerID, err)
 	}
-	if res.Error != nil && (res.Error.Code > 0 || res.Error.Err != "") {
+	if res.Error != nil && (res.Error.Code != "" || res.Error.Err != "") {
 		return nil, fmt.Errorf("failed to get user info by user ID %d: %d %s", decodedToken.FreelancerID, res.Error.Code, res.Error.Error())
 	}
 

@@ -245,28 +245,34 @@ func (r *ReportsShipmentClose) MarshalJSON() ([]byte, error) {
 }
 
 type ReportsFinanceRoutes struct {
-	isEnabled           bool          // ro
-	errRetryTaskLimit   int           // ro
-	pollingInterval     time.Duration // ro
-	taskTimeout         time.Duration // ro
-	isRenderTelegramBot bool          // ro
+	isEnabled                   bool          // ro
+	errRetryTaskLimit           int           // ro
+	pollingInterval             time.Duration // ro
+	taskTimeout                 time.Duration // ro
+	renderDelay                 time.Duration // ro
+	sendMessageDelayTelegramBot time.Duration // ro
+	isRenderTelegramBot         bool          // ro
 }
 
 type reportsFinanceRoutes struct {
-	IsEnabled           bool          `json:"enabled"`
-	ErrRetryTaskLimit   int           `json:"err_retry_task_limit"`
-	PollingInterval     time.Duration `json:"polling_interval"`
-	TaskTimeout         time.Duration `json:"task_timeout"`
-	IsRenderTelegramBot bool          `json:"render_telegram_bot"`
+	IsEnabled                   bool          `json:"enabled"`
+	ErrRetryTaskLimit           int           `json:"err_retry_task_limit"`
+	PollingInterval             time.Duration `json:"polling_interval"`
+	TaskTimeout                 time.Duration `json:"task_timeout"`
+	RenderDelay                 time.Duration `json:"render_delay"`
+	SendMessageDelayTelegramBot time.Duration `json:"send_message_delay_telegram_bot"`
+	IsRenderTelegramBot         bool          `json:"render_telegram_bot"`
 }
 
 func newReportsFinanceRoutes() *ReportsFinanceRoutes {
 	return &ReportsFinanceRoutes{
-		isEnabled:           false,                       // default
-		errRetryTaskLimit:   3,                           // default
-		pollingInterval:     1000 * reportsTimePeriod,    // default
-		taskTimeout:         600_000 * reportsTimePeriod, // default
-		isRenderTelegramBot: false,                       // default
+		isEnabled:                   false,                       // default
+		errRetryTaskLimit:           3,                           // default
+		pollingInterval:             1000 * reportsTimePeriod,    // default
+		taskTimeout:                 600_000 * reportsTimePeriod, // default
+		renderDelay:                 600_000 * reportsTimePeriod, // default
+		sendMessageDelayTelegramBot: 120_000 * reportsTimePeriod, // default
+		isRenderTelegramBot:         false,                       // default
 	}
 }
 
@@ -277,6 +283,14 @@ func (r *ReportsFinanceRoutes) PollingInterval() time.Duration { return r.pollin
 func (r *ReportsFinanceRoutes) TaskTimeout() time.Duration { return r.taskTimeout }
 
 func (r *ReportsFinanceRoutes) ErrRetryTaskLimit() int { return r.errRetryTaskLimit }
+
+func (r *ReportsFinanceRoutes) RenderDelay() time.Duration {
+	return r.renderDelay
+}
+
+func (r *ReportsFinanceRoutes) SendMessageDelayTelegramBot() time.Duration {
+	return r.sendMessageDelayTelegramBot
+}
 
 func (r *ReportsFinanceRoutes) IsRenderTelegramBot() bool { return r.isRenderTelegramBot }
 
@@ -290,17 +304,21 @@ func (r *ReportsFinanceRoutes) UnmarshalJSON(b []byte) error {
 	r.pollingInterval = temp.PollingInterval * reportsTimePeriod
 	r.errRetryTaskLimit = temp.ErrRetryTaskLimit
 	r.taskTimeout = temp.TaskTimeout * reportsTimePeriod
+	r.renderDelay = temp.RenderDelay * reportsTimePeriod
+	r.sendMessageDelayTelegramBot = temp.SendMessageDelayTelegramBot * reportsTimePeriod
 	r.isRenderTelegramBot = temp.IsRenderTelegramBot
 	return nil
 }
 
 func (r *ReportsFinanceRoutes) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&reportsFinanceRoutes{
-		IsEnabled:           r.isEnabled,
-		PollingInterval:     r.pollingInterval / reportsTimePeriod,
-		ErrRetryTaskLimit:   r.errRetryTaskLimit,
-		TaskTimeout:         r.taskTimeout / reportsTimePeriod,
-		IsRenderTelegramBot: r.isRenderTelegramBot,
+		IsEnabled:                   r.isEnabled,
+		PollingInterval:             r.pollingInterval / reportsTimePeriod,
+		ErrRetryTaskLimit:           r.errRetryTaskLimit,
+		TaskTimeout:                 r.taskTimeout / reportsTimePeriod,
+		RenderDelay:                 r.renderDelay / reportsTimePeriod,
+		SendMessageDelayTelegramBot: r.sendMessageDelayTelegramBot / reportsTimePeriod,
+		IsRenderTelegramBot:         r.isRenderTelegramBot,
 	})
 }
 

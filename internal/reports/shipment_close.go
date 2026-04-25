@@ -1,6 +1,7 @@
 package reports
 
 import (
+	"fmt"
 	"slices"
 	"strconv"
 	"time"
@@ -8,21 +9,23 @@ import (
 )
 
 type ShipmentCloseReportData struct {
-	RouteID               int
-	ShipmentID            int
-	WaySheetID            int
-	Date                  time.Time
-	DateCreate            time.Time
-	DateClose             time.Time
-	Parking               int
-	DriverName            string
-	VehicleNumberPlate    string
-	TotalRemainsBarcodes  int
-	TotalRemainsTares     int
-	TotalTransferBarcodes int
-	TotalTransferTares    int
-	SpName                string
-	RemainsTaresInfo      []*ShipmentCloseRemainsTareInfo
+	RouteID                  int
+	ShipmentID               int
+	WaySheetID               int
+	Date                     time.Time
+	DateCreate               time.Time
+	DateClose                time.Time
+	Parking                  int
+	DriverName               string
+	VehicleNumberPlate       string
+	BarcodesTotalRemains     int
+	BarcodesTotalTransfer    int
+	BarcodesStandard         float64
+	BarcodesDeviationPercent float64
+	TareTotalRemains         int
+	TareTotalTransfer        int
+	SpName                   string
+	RemainsTaresInfo         []*ShipmentCloseRemainsTareInfo
 }
 
 type ShipmentCloseRemainsTareInfo struct {
@@ -56,15 +59,17 @@ func (r *ShipmentCloseReport) Render(data *ShipmentCloseReportData) (*ReportData
 				Link: "https://logistics.wildberries.ru/external-logistics/shipments-shell/shipments/" + strconv.Itoa(data.ShipmentID)},
 			{Text: "Путевой лист:", Bold: true, Block: true}, {Text: strconv.Itoa(data.WaySheetID),
 				Link: "https://ol.wildberries.ru/#/layout/external-waysheet/" + strconv.Itoa(data.WaySheetID)},
-			{Text: "Дата погрузки:", Bold: true, Block: true}, {Text: data.Date.Format("02.01.2006")},
-			{Text: "Время открытия:", Bold: true, Block: true}, {Text: data.DateCreate.Format("15:04")},
-			{Text: "Время закрытия:", Bold: true, Block: true}, {Text: data.DateClose.Format("15:04")},
+			{Text: "Дата:", Bold: true, Block: true}, {Text: data.Date.Format("02.01.2006")},
+			{Text: "Открытие:", Bold: true, Block: true}, {Text: data.DateCreate.Format("15:04")},
+			{Text: "Закрытие:", Bold: true, Block: true}, {Text: data.DateClose.Format("15:04")},
 			{Text: "Водитель:", Bold: true, Block: true}, {Text: data.DriverName},
 			{Text: "Автомобиль:", Bold: true, Block: true}, {Text: data.VehicleNumberPlate},
-			{Text: "Остаток ШК:", Bold: true, Block: true}, {Text: strconv.Itoa(data.TotalRemainsBarcodes)},
-			{Text: "Остаток тар:", Bold: true, Block: true}, {Text: strconv.Itoa(data.TotalRemainsTares)},
-			{Text: "Отгружено ШК:", Bold: true, Block: true}, {Text: strconv.Itoa(data.TotalTransferBarcodes)},
-			{Text: "Отгружено тар:", Bold: true, Block: true}, {Text: strconv.Itoa(data.TotalTransferTares)},
+			{Text: "ШК остаток:", Bold: true, Block: true}, {Text: strconv.Itoa(data.BarcodesTotalRemains)},
+			{Text: "ШК отгружено:", Bold: true, Block: true}, {Text: strconv.Itoa(data.BarcodesTotalTransfer)},
+			{Text: "ШК норматив:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.0f", data.BarcodesStandard)},
+			{Text: "ШК отклонение:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.1f%%", data.BarcodesDeviationPercent)},
+			{Text: "Тара остаток:", Bold: true, Block: true}, {Text: strconv.Itoa(data.TareTotalRemains)},
+			{Text: "Тара отгружено:", Bold: true, Block: true}, {Text: strconv.Itoa(data.TareTotalTransfer)},
 			{Text: "МХ:", Bold: true, Block: true}, {Text: data.SpName},
 			{Block: true},
 		},

@@ -18,11 +18,11 @@ const (
 )
 
 func (i *Initializer) AuthSession(client *wb_logistic_api.Client) (*session.Session, error) {
-	logger.Log(logger.INFO, "Initializer.AuthSession()", "start auth wb logistic session")
+	logger.Log(logger.INFO, "Initializer.WBLogistic.AuthSession()", "start auth wb logistic session")
 
 	login, err := i.getLogin()
 	if err != nil {
-		return nil, errors.Wrap(err, "Initializer.AuthSession()", "")
+		return nil, errors.Wrap(err, "Initializer.WBLogistic.AuthSession()", "")
 	}
 
 	var accessToken *wb_models.AuthAccessToken
@@ -65,17 +65,17 @@ mainLoop:
 					accessToken, err = i.getManualAccessToken()
 					if err != nil {
 						i.prompter.PromptWBLogisticInvalidAccessTokenData()
-						logger.Logf(logger.ERROR, "Initializer.AuthSession()", "failed to manual get access token: %v", err)
+						logger.Logf(logger.ERROR, "Initializer.WBLogistic.AuthSession()", "failed to manual get access token: %v", err)
 						continue
 					}
 					break mainLoop
 				}
 			case Exit:
-				return nil, errors.New("Initializer.AuthSession()", "failed request auth code, action is canceled")
+				return nil, errors.New("Initializer.WBLogistic.AuthSession()", "failed request auth code, action is canceled")
 			default:
 				accessToken, err = client.ExchangeAuthCode(context.Background(), code, resCodeData.Sticker)
 				if err != nil {
-					logger.Logf(logger.ERROR, "Initializer.AuthSession()", "failed to exchange auth code: %v", err)
+					logger.Logf(logger.ERROR, "Initializer.WBLogistic.AuthSession()", "failed to exchange auth code: %v", err)
 					i.prompter.PromptWBLogisticAuthFailed()
 					continue
 				}
@@ -86,16 +86,16 @@ mainLoop:
 
 	sessionToken, userInfo, err := client.GetSessionToken(context.Background(), login, accessToken.AccessToken)
 	if err != nil {
-		return nil, errors.Wrap(err, "Initializer.AuthSession()", "failed to get session token")
+		return nil, errors.Wrap(err, "Initializer.WBLogistic.AuthSession()", "failed to get session token")
 	}
 
 	if err = userInfo.Validate(); err != nil {
-		return nil, errors.Wrap(err, "Initializer.AuthSession()", "invalid user info. account does not exist or does not have access to this service")
+		return nil, errors.Wrap(err, "Initializer.WBLogistic.AuthSession()", "invalid user info. account does not exist or does not have access to this service")
 	}
 
 	s := session.NewSessionFromToken(login, accessToken, sessionToken, userInfo)
 	if !s.IsAuth() || s.SessionTokenExpired() || s.AccessTokenExpired() {
-		return nil, errors.New("Initializer.AuthSession()", "failed to auth session: session was not authorized, invalid data received")
+		return nil, errors.New("Initializer.WBLogistic.AuthSession()", "failed to auth session: session was not authorized, invalid data received")
 	}
 
 	s.Emitter().On(session.EventUpdateAccessToken, i.updateAccessTokenHandler)
@@ -105,24 +105,24 @@ mainLoop:
 	i.SetLoginStorage(login)
 	err = i.SetAccessTokenStorage(accessToken)
 	if err != nil {
-		return nil, errors.Wrap(err, "Initializer.AuthSession()", "failed to save access token to storage")
+		return nil, errors.Wrap(err, "Initializer.WBLogistic.AuthSession()", "failed to save access token to storage")
 	}
 	err = i.SetSessionTokenStorage(sessionToken)
 	if err != nil {
-		return nil, errors.Wrap(err, "Initializer.AuthSession()", "failed to save session token to storage")
+		return nil, errors.Wrap(err, "Initializer.WBLogistic.AuthSession()", "failed to save session token to storage")
 	}
 
 	err = i.SetUserInfoStorage(userInfo)
 	if err != nil {
-		return nil, errors.Wrap(err, "Initializer.AuthSession()", "failed to save user info to storage")
+		return nil, errors.Wrap(err, "Initializer.WBLogistic.AuthSession()", "failed to save user info to storage")
 	}
 
 	err = i.UpdateStorage()
 	if err != nil {
-		return nil, errors.Wrap(err, "Initializer.AuthSession()", "")
+		return nil, errors.Wrap(err, "Initializer.WBLogistic.AuthSession()", "")
 	}
 
-	logger.Logf(logger.INFO, "Initializer.AuthSession()", "successful initialize WB logistic client session id:'%d' login:'%s'", s.UserInfo().ID, login)
+	logger.Logf(logger.INFO, "Initializer.WBLogistic.AuthSession()", "successful initialize WB logistic client session id:'%d' login:'%s'", s.UserInfo().ID, login)
 	return s, nil
 }
 
@@ -136,11 +136,11 @@ func (i *Initializer) getLogin() (string, error) {
 			return login, nil
 		}
 
-		logger.Logf(logger.WARN, "Initializer.getLogin()", "invalid login: '%s' entered", login)
+		logger.Logf(logger.WARN, "Initializer.WBLogistic.getLogin()", "invalid login: '%s' entered", login)
 		i.prompter.PromptWBLogisticInvalidAuthLogin()
 
 		if attempt >= 2 {
-			return "", errors.New("Initializer.getLogin()", "failed request auth login")
+			return "", errors.New("Initializer.WBLogistic.getLogin()", "failed request auth login")
 		}
 	}
 	return "", nil
@@ -149,58 +149,58 @@ func (i *Initializer) getLogin() (string, error) {
 func (i *Initializer) getManualAccessToken() (*wb_models.AuthAccessToken, error) {
 	token := i.prompter.PromptWBLogisticRequestAccessTokenData()
 	if token == "" {
-		return nil, errors.New("Initializer.getManualAccessToken()", "token is empty")
+		return nil, errors.New("Initializer.WBLogistic.getManualAccessToken()", "token is empty")
 	}
 
 	accessToken := &wb_models.AuthAccessToken{}
 
 	err := json.Unmarshal([]byte(token), accessToken)
 	if err != nil {
-		return nil, errors.Wrap(err, "Initializer.getManualAccessToken()", "invalid format data access token")
+		return nil, errors.Wrap(err, "Initializer.WBLogistic.getManualAccessToken()", "invalid format data access token")
 	}
 
 	if accessToken.AccessToken == "" || accessToken.RefreshToken == "" || accessToken.ExpiresIn < 0 {
-		return nil, errors.New("Initializer.getManualAccessToken()", "invalid data access token")
+		return nil, errors.New("Initializer.WBLogistic.getManualAccessToken()", "invalid data access token")
 	}
 
 	return accessToken, nil
 }
 
 func (i *Initializer) authSessionStorage(client *wb_logistic_api.Client) (*session.Session, error) {
-	logger.Log(logger.INFO, "Initializer.authSessionStorage()", "start auth wb logistic session using storage")
+	logger.Log(logger.INFO, "Initializer.WBLogistic.authSessionStorage()", "start auth wb logistic session using storage")
 
 	login := i.GetLoginStorage()
 	if login == "" {
-		return nil, errors.New("Initializer.authSessionStorage()", "no login storage found")
+		return nil, errors.New("Initializer.WBLogistic.authSessionStorage()", "no login storage found")
 	}
 	accessToken, err := i.GetAccessTokenStorage()
 	if err != nil {
-		return nil, errors.Wrap(err, "Initializer.authSessionStorage()", "failed get access token from storage")
+		return nil, errors.Wrap(err, "Initializer.WBLogistic.authSessionStorage()", "failed get access token from storage")
 	}
 
 	sessionToken, err := i.GetSessionTokenStorage()
 	if err != nil {
-		return nil, errors.Wrap(err, "Initializer.authSessionStorage()", "failed get session token from storage")
+		return nil, errors.Wrap(err, "Initializer.WBLogistic.authSessionStorage()", "failed get session token from storage")
 	}
 	userInfo, err := i.GetUserInfoStorage()
 	if err != nil {
-		return nil, errors.Wrap(err, "Initializer.authSessionStorage()", "failed get user info from storage")
+		return nil, errors.Wrap(err, "Initializer.WBLogistic.authSessionStorage()", "failed get user info from storage")
 	}
 
 	s := session.NewSessionFromToken(login, accessToken, sessionToken, userInfo)
 	if !s.IsAuth() {
-		return nil, errors.New("Initializer.authSessionStorage()", "session was not auth")
+		return nil, errors.New("Initializer.WBLogistic.authSessionStorage()", "session was not auth")
 	}
 	if s.AccessTokenExpired() {
-		return nil, errors.New("Initializer.authSessionStorage()", "access token expired")
+		return nil, errors.New("Initializer.WBLogistic.authSessionStorage()", "access token expired")
 	}
 	if s.SessionTokenExpired() {
 		sessionToken, userInfo, err = client.GetSessionToken(context.Background(), login, accessToken.AccessToken)
 		if err != nil {
-			return nil, errors.Wrap(err, "Initializer.authSessionStorage()", "failed refresh session token")
+			return nil, errors.Wrap(err, "Initializer.WBLogistic.authSessionStorage()", "failed refresh session token")
 		}
 		if err = userInfo.Validate(); err != nil {
-			return nil, errors.Wrap(err, "Initializer.authSessionStorage()", "invalid user info. account does not exist or does not have access to this service")
+			return nil, errors.Wrap(err, "Initializer.WBLogistic.authSessionStorage()", "invalid user info. account does not exist or does not have access to this service")
 		}
 	}
 
@@ -210,38 +210,38 @@ func (i *Initializer) authSessionStorage(client *wb_logistic_api.Client) (*sessi
 
 	err = i.SetAccessTokenStorage(accessToken)
 	if err != nil {
-		return nil, errors.Wrap(err, "Initializer.authSessionStorage()", "failed to save access token to storage")
+		return nil, errors.Wrap(err, "Initializer.WBLogistic.authSessionStorage()", "failed to save access token to storage")
 	}
 	err = i.SetSessionTokenStorage(sessionToken)
 	if err != nil {
-		return nil, errors.Wrap(err, "Initializer.authSessionStorage()", "failed to save session token to storage")
+		return nil, errors.Wrap(err, "Initializer.WBLogistic.authSessionStorage()", "failed to save session token to storage")
 	}
 	err = i.SetUserInfoStorage(userInfo)
 	if err != nil {
-		return nil, errors.Wrap(err, "Initializer.authSessionStorage()", "failed to save user info to storage")
+		return nil, errors.Wrap(err, "Initializer.WBLogistic.authSessionStorage()", "failed to save user info to storage")
 	}
 
-	logger.Logf(logger.INFO, "Initializer.authSessionStorage()", "finish auth wb logistic session id:'%d' phone number:'%s' using storage", s.UserInfo().ID, s.UserInfo().UserDetails.PhoneNumber)
+	logger.Logf(logger.INFO, "Initializer.WBLogistic.authSessionStorage()", "finish auth wb logistic session id:'%d' phone number:'%s' using storage", s.UserInfo().ID, s.UserInfo().UserDetails.PhoneNumber)
 	return s, nil
 }
 
 func (i *Initializer) updateAccessTokenHandler(s *session.Session) {
 	err := i.SetAccessTokenStorage(s.AccessToken())
 	if err != nil {
-		logger.Log(logger.ERROR, "Initializer.updateAccessTokenHandler()", "failed to save access token to storage")
+		logger.Log(logger.ERROR, "Initializer.WBLogistic.updateAccessTokenHandler()", "failed to save access token to storage")
 	}
 }
 
 func (i *Initializer) updateSessionTokenHandler(s *session.Session) {
 	err := i.SetSessionTokenStorage(s.SessionToken())
 	if err != nil {
-		logger.Log(logger.ERROR, "Initializer.updateSessionTokenHandler()", "failed to save session token to storage")
+		logger.Log(logger.ERROR, "Initializer.WBLogistic.updateSessionTokenHandler()", "failed to save session token to storage")
 	}
 }
 
 func (i *Initializer) updateUserInfoHandler(s *session.Session) {
 	err := i.SetUserInfoStorage(s.UserInfo())
 	if err != nil {
-		logger.Log(logger.ERROR, "Initializer.updateUserInfoHandler()", "failed to save user info to storage")
+		logger.Log(logger.ERROR, "Initializer.WBLogistic.updateUserInfoHandler()", "failed to save user info to storage")
 	}
 }

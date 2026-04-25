@@ -25,7 +25,7 @@ func NewInitializer(config *config.Config, storage storage.Storage, prompter pro
 }
 
 func (i *Initializer) Init() (*google_sheets_api.Client, auth.Actor, error) {
-	logger.Log(logger.INFO, "Initializer.Init()", "Start init Google Sheets")
+	logger.Log(logger.INFO, "Initializer.GoogleSheets.Init()", "Start init Google Sheets")
 
 	client := google_sheets_api.NewClient()
 
@@ -39,17 +39,17 @@ func (i *Initializer) Init() (*google_sheets_api.Client, auth.Actor, error) {
 	}
 	if err != nil {
 		i.prompter.PromptGoogleSheetsAuthFailed()
-		return nil, nil, errors.Wrap(err, "Initializer.Init()", "failed to auth google sheets client session")
+		return nil, nil, errors.Wrap(err, "Initializer.GoogleSheets.Init()", "failed to auth google sheets client session")
 	}
 
 	err = i.UpdateStorage()
 	if err != nil {
 		i.prompter.PromptGoogleSheetsAuthFailed()
-		return nil, nil, errors.Wrap(err, "Initializer.Init()", "failed to update storage")
+		return nil, nil, errors.Wrap(err, "Initializer.GoogleSheets.Init()", "failed to update storage")
 	}
 
 	i.prompter.PromptGoogleSheetsAuthSuccessful()
 
-	logger.Log(logger.INFO, "Initializer.Init()", "Finish init Google Sheets")
+	logger.Log(logger.INFO, "Initializer.GoogleSheets.Init()", "Finish init Google Sheets")
 	return client, actor, nil
 }

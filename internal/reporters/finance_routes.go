@@ -29,16 +29,18 @@ type FinanceRoutesReporter struct {
 	tgChatID       int64
 	isRenderTG     bool
 
-	officeID          int
-	suppliers         map[int]struct{} // supplier id -> struct{}
-	skipRoutes        map[int]struct{} // route id -> struct{}
-	salaryRatePercent map[int]float64  // route id -> salary rate
-	salaryRate        map[int]float64  // route id -> salary rate
-	percentTax        float64
-	taxRate           float64
-	percentDefect     float64
-	defectRate        float64
-	delayDuration     time.Duration
+	officeID           int
+	suppliers          map[int]struct{} // supplier id -> struct{}
+	skipRoutes         map[int]struct{} // route id -> struct{}
+	salaryRatePercent  map[int]float64  // route id -> salary rate
+	salaryRate         map[int]float64  // route id -> salary rate
+	barcodesStandard   map[int]float64  // route id -> standard
+	percentTax         float64
+	taxRate            float64
+	percentDefect      float64
+	defectRate         float64
+	tgSendMessageDelay time.Duration
+	renderDelay        time.Duration
 
 	delayTimeMap    map[string]time.Time
 	openedWaySheets map[string]*wb_models.WaySheet // way sheet id -> way sheet
@@ -57,16 +59,18 @@ func NewFinanceRoutesReporter(config *config.Config, storage storage.Storage, se
 		tgChatID:       config.Telegram().FinanceRoutes().ChatID(),
 		isRenderTG:     config.Reports().FinanceRoutes().IsRenderTelegramBot(),
 
-		officeID:          config.Logistic().Office().ID(),
-		suppliers:         config.Logistic().Office().SuppliersMap(),
-		skipRoutes:        config.Logistic().Office().SkipRoutesMap(),
-		salaryRatePercent: config.Logistic().Office().SalaryRatePercent(),
-		salaryRate:        config.Logistic().Office().SalaryRate(),
-		percentTax:        config.Logistic().Office().PercentTax(),
-		taxRate:           config.Logistic().Office().PercentTax() / 100,
-		percentDefect:     config.Logistic().Office().PercentDefect(),
-		defectRate:        config.Logistic().Office().PercentDefect() / 100,
-		delayDuration:     10 * time.Minute,
+		officeID:           config.Logistic().Office().ID(),
+		suppliers:          config.Logistic().Office().SuppliersMap(),
+		skipRoutes:         config.Logistic().Office().SkipRoutesMap(),
+		salaryRatePercent:  config.Logistic().Office().SalaryRatePercent(),
+		salaryRate:         config.Logistic().Office().SalaryRate(),
+		barcodesStandard:   config.Logistic().Office().BarcodesStandard(),
+		percentTax:         config.Logistic().Office().PercentTax(),
+		taxRate:            config.Logistic().Office().PercentTax() / 100,
+		percentDefect:      config.Logistic().Office().PercentDefect(),
+		defectRate:         config.Logistic().Office().PercentDefect() / 100,
+		tgSendMessageDelay: config.Reports().FinanceRoutes().SendMessageDelayTelegramBot(),
+		renderDelay:        config.Reports().FinanceRoutes().RenderDelay(),
 
 		delayTimeMap:    make(map[string]time.Time),
 		openedWaySheets: make(map[string]*wb_models.WaySheet),
@@ -137,7 +141,7 @@ func (r *FinanceRoutesReporter) processOpenedWaySheets(ctx context.Context) erro
 		if !waySheet.CloseDt.IsZero() {
 			delay, ok := r.delayTimeMap[id]
 			if !ok {
-				r.delayTimeMap[id] = now.Add(r.delayDuration)
+				r.delayTimeMap[id] = now.Add(r.renderDelay)
 				continue
 			} else if now.Before(delay) || waySheet.TotalPrice == 0 { // financial data may appear with a delay, skips if it has not yet appeared
 				continue
@@ -204,6 +208,15 @@ func (r *FinanceRoutesReporter) processOpenedWaySheets(ctx context.Context) erro
 				logger.Logf(logger.ERROR, "FinanceRoutesReporter.processOpenedWaySheets()", "there is no salary rate data for the route %d, way sheet %d", routeID, waySheetID)
 			}
 
+			barcodesDeviation := 0.0
+			barcodesStandard := r.barcodesStandard[routeID]
+			if barcodesStandard != 0 {
+				barcodesDeviation = (float64(info.TotalBarcodesCount) - barcodesStandard) / barcodesStandard * 100
+			} else {
+				r.prompter.PromptError(fmt.Sprintf("There is no barcode standard for route %d, way sheet %s", routeID, waySheet.WaySheetID))
+				logger.Logf(logger.ERROR, "FinanceRoutesReporter.processOpenedWaySheets()", "there is no barcode standard for route %d, way sheet %s", routeID, waySheet.WaySheetID)
+			}
+
 			incomeTotal := waySheet.TotalPrice - waySheet.SumFine
 			defect := incomeTotal * r.defectRate
 			tax := (incomeTotal - defect) * r.taxRate
@@ -215,30 +228,33 @@ func (r *FinanceRoutesReporter) processOpenedWaySheets(ctx context.Context) erro
 			r.prompter.PromptCloseWaySheet(routeID, waySheet.WaySheetID, shipmentID)
 			logger.Logf(logger.INFO, "FinanceRoutesReporter.processOpenedWaySheets()", "way sheet %d is closed on route %d, shipment %s", waySheetID, routeID, shipmentID)
 			err = r.sendReport(ctx, &reports.FinanceRoutesReportData{
-				RouteID:            routeID,
-				ShipmentID:         shipmentID,
-				WaySheetID:         id,
-				Parking:            parking,
-				DateOpen:           info.DateOpen,
-				DriverName:         driverName,
-				VehicleNumberPlate: info.Vehicles.ShippingCarNumber,
-				ShippedBarcodes:    info.TotalBarcodesCount,
-				ShippedTare:        shippedTare,
-				TotalReturnTare:    totalReturnTare,
-				CurrentReturnTare:  currentReturnTare,
-				Mileage:            mileage,
-				IncomeMileage:      incomeMileage,
-				Income:             waySheet.TotalPrice,
-				IncomeTotal:        incomeTotal,
-				Fine:               waySheet.SumFine,
-				IncomeReturn:       waySheet.SumReturn,
-				SalaryRate:         salaryRate,
-				ExtendedSalaryRate: extendedSalaryRate,
-				Defect:             defect,
-				PercentDefect:      r.percentDefect,
-				Tax:                tax,
-				PercentTax:         r.percentTax,
-				Margin:             margin,
+				RouteID:                  routeID,
+				ShipmentID:               shipmentID,
+				WaySheetID:               id,
+				Parking:                  parking,
+				DateOpen:                 info.DateOpen,
+				DateClose:                info.DateClose,
+				DriverName:               driverName,
+				VehicleNumberPlate:       info.Vehicles.ShippingCarNumber,
+				BarcodesShipped:          info.TotalBarcodesCount,
+				BarcodesStandard:         barcodesStandard,
+				BarcodesDeviationPercent: barcodesDeviation,
+				TareShipped:              shippedTare,
+				TotalReturnTare:          totalReturnTare,
+				CurrentReturnTare:        currentReturnTare,
+				Mileage:                  mileage,
+				IncomeMileage:            incomeMileage,
+				Income:                   waySheet.TotalPrice,
+				IncomeTotal:              incomeTotal,
+				Fine:                     waySheet.SumFine,
+				IncomeReturn:             waySheet.SumReturn,
+				SalaryRate:               salaryRate,
+				ExtendedSalaryRate:       extendedSalaryRate,
+				Defect:                   defect,
+				PercentDefect:            r.percentDefect,
+				Tax:                      tax,
+				PercentTax:               r.percentTax,
+				Margin:                   margin,
 			})
 			if err != nil {
 				r.prompter.PromptError(fmt.Sprintf("Failed send report, route %d, shipment: %s, way sheet: %d", routeID, shipmentID, waySheetID))
@@ -399,6 +415,7 @@ func (r *FinanceRoutesReporter) sendTelegramBot(ctx context.Context) error {
 			return errors.Wrapf(err, "FinanceRoutesReporter.sendTelegramBot()", "failed send data to chat %d", r.tgChatID)
 		}
 		r.messageQueueTG.Pop()
+		time.Sleep(r.tgSendMessageDelay) // antispam
 	}
 
 	return nil

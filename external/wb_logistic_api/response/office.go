@@ -17,7 +17,7 @@ type GetAssociationOfficesInfoByNameResponse struct {
 func (r *GetAssociationOfficesInfoByNameResponse) UnmarshalJSON(data []byte) error {
 	var apiErr errors.APIError
 	if err := json.Unmarshal(data, &apiErr); err == nil {
-		if apiErr.Code != 0 || apiErr.Err != "" {
+		if apiErr.Code != "" || apiErr.Err != "" {
 			r.Error = &apiErr
 			return nil
 		}

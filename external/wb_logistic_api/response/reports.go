@@ -17,7 +17,7 @@ type GetRemainsLastMileReportsResponse struct {
 func (r *GetRemainsLastMileReportsResponse) UnmarshalJSON(data []byte) error {
 	var apiErr errors.APIError
 	if err := json.Unmarshal(data, &apiErr); err == nil {
-		if apiErr.Code != 0 || apiErr.Err != "" {
+		if apiErr.Code != "" || apiErr.Err != "" {
 			r.Error = &apiErr
 			return nil
 		}
@@ -46,7 +46,7 @@ type GetRemainsLastMileReportsRouteInfoResponse struct {
 func (r *GetRemainsLastMileReportsRouteInfoResponse) UnmarshalJSON(data []byte) error {
 	var apiErr errors.APIError
 	if err := json.Unmarshal(data, &apiErr); err == nil {
-		if apiErr.Code != 0 || apiErr.Err != "" {
+		if apiErr.Code != "" || apiErr.Err != "" {
 			r.Error = &apiErr
 			return nil
 		}

@@ -5,29 +5,31 @@ import (
 	"time"
 )
 
+const prefixCLIReporterFinanceRoutesPrompter = "[Отчет финансов маршрута]"
+
 type CLIReporterFinanceRoutesPrompter struct {
 }
 
 func (p *CLIReporterFinanceRoutesPrompter) PromptStart() {
-	fmt.Println("Старт обновления [отчет финансов маршрута]...")
+	fmt.Println(prefixCLIReporterFinanceRoutesPrompter, "Старт формирования...")
 }
 
 func (p *CLIReporterFinanceRoutesPrompter) PromptFinish(duration time.Duration) {
-	fmt.Println("[Отчет финансов маршрута] был обновлен. Время обновления: ", duration)
+	fmt.Println(prefixCLIReporterFinanceRoutesPrompter, "Сформирован:", duration)
 }
 
 func (p *CLIReporterFinanceRoutesPrompter) PromptCountWaySheet(count int) {
-	fmt.Printf("[Отчет финансов маршрута]: Количество открытых путевых листов: %d\n", count)
+	fmt.Printf("%s Количество открытых путевых листов: %d\n", prefixCLIReporterFinanceRoutesPrompter, count)
 }
 
 func (p *CLIReporterFinanceRoutesPrompter) PromptCloseWaySheet(routeID int, waySheetID, shipmentID string) {
-	fmt.Printf("[Отчет финансов маршрута]: Закрыт путевой лист: %s на маршруте %d, отгрузка %s\n", waySheetID, routeID, shipmentID)
+	fmt.Printf("%s Закрыт путевой лист: %s  Маршрут: %d  Отгрузка: %s\n", prefixCLIReporterFinanceRoutesPrompter, waySheetID, routeID, shipmentID)
 }
 
 func (p *CLIReporterFinanceRoutesPrompter) PromptSendReport(routeID int, waySheetID, shipmentID string) {
-	fmt.Printf("[Отчет финансов маршрута]: Отправлен отчет по путевому листу: %s на маршруте %d, отгрузка %s\n", waySheetID, routeID, shipmentID)
+	fmt.Printf("%s Отчет отправлен. Путевой лист: %s  Маршрут: %d  Отгрузка: %s\n", prefixCLIReporterFinanceRoutesPrompter, waySheetID, routeID, shipmentID)
 }
 
 func (p *CLIReporterFinanceRoutesPrompter) PromptError(message string) {
-	fmt.Println("Ошибка составления [отчет финансов маршрута]:", message)
+	fmt.Println(prefixCLIReporterFinanceRoutesPrompter, "Ошибка:", message)
 }

@@ -10,11 +10,12 @@ type FinanceDailyGeneralReportData struct {
 	DateStart          time.Time
 	DateEnd            time.Time
 	Flights            int
-	OpenedFlights      int
-	ShippedBarcodes    int
+	FlightsOpened      int
+	BarcodesShipped    int
+	BarcodesAverage    float64
 	Tare               int
-	ShippedTare        int
-	ReturnedTare       int
+	TareShipped        int
+	TareReturned       int
 	Income             float64
 	IncomeReturn       float64
 	Fine               float64
@@ -52,11 +53,12 @@ func (r *FinanceDailyGeneralReport) Render(data *FinanceDailyGeneralReportData) 
 			{Text: "Начало:", Bold: true, Block: true}, {Text: data.DateStart.Format("02.01.2006 15:04")},
 			{Text: "Конец:", Bold: true, Block: true}, {Text: data.DateEnd.Format("02.01.2006 15:04")},
 			{Text: "Рейсы:", Bold: true, Block: true}, {Text: itoa(data.Flights)},
-			{Text: "Незавершенные рейсы:", Bold: true, Block: true}, {Text: itoa(data.OpenedFlights)},
-			{Text: "ШК:", Bold: true, Block: true}, {Text: itoa(data.ShippedBarcodes)},
+			{Text: "Незавершенные рейсы:", Bold: true, Block: true}, {Text: itoa(data.FlightsOpened)},
+			{Text: "ШК отгружено:", Bold: true, Block: true}, {Text: itoa(data.BarcodesShipped)},
+			{Text: "ШК среднее:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.1f", data.BarcodesAverage)},
 			{Text: "Тара:", Bold: true, Block: true}, {Text: itoa(data.Tare)},
-			{Text: "Доставлено тар:", Bold: true, Block: true}, {Text: itoa(data.ShippedTare)},
-			{Text: "Возврат тар:", Bold: true, Block: true}, {Text: itoa(data.ReturnedTare)},
+			{Text: "Тара доставлено:", Bold: true, Block: true}, {Text: itoa(data.TareShipped)},
+			{Text: "Тара возврат:", Bold: true, Block: true}, {Text: itoa(data.TareReturned)},
 			{Text: "Задание:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р.", data.Income)},
 			{Text: "Возврат:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р.", data.IncomeReturn)},
 			{Text: "Штраф:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р.", data.Fine)},

@@ -47,7 +47,6 @@ func NewInitializer(config *config.Config, storage storage.Storage, prompter pro
 func (i *Initializer) Init() (*AppDependencies, error) {
 	logger.Log(logger.INFO, "Initializer.Init()", "Start init application dependencies")
 
-	//// Services
 	err := i.initWBLogistic(i.config.Logistic().CacheTTL())
 	if err != nil {
 		return nil, errors.Wrap(err, "Initializer.Init()", "")
@@ -65,7 +64,7 @@ func (i *Initializer) Init() (*AppDependencies, error) {
 
 	i.initScheduler()
 
-	i.initOrchestrators()
+	i.initReporters()
 
 	logger.Log(logger.INFO, "Initializer.Init()", "Finish init application dependencies, successfully initialized")
 	i.prompter.PromptInitFinish()
@@ -107,12 +106,12 @@ func (i *Initializer) InitDirectWBLogistic() error {
 
 		wbLogisticClient, wbLogisticSession, err := i.wbLogistic.InitDirect()
 		if err != nil {
-			return errors.Wrap(err, "Initializer.initWBLogistic()", "Failed to init WB Logistic client")
+			return errors.Wrap(err, "Initializer.InitDirectWBLogistic()", "Failed to init WB Logistic client")
 		}
 		i.services.WBLogisticService.SetClient(wbLogisticClient)
 		i.services.WBLogisticService.SetSession(wbLogisticSession)
 	} else {
-		return errors.New("Initializer.initWBLogistic()", "All reports are disabled")
+		return errors.New("Initializer.InitDirectWBLogistic()", "All reports are disabled")
 	}
 	return nil
 }
@@ -143,7 +142,7 @@ func (i *Initializer) initTelegramBot() error {
 }
 
 func (i *Initializer) initScheduler() {
-	logger.Log(logger.INFO, "Initializer.initServices()", "Start init application scheduler")
+	logger.Log(logger.INFO, "Initializer.initScheduler()", "Start init application scheduler")
 	i.dependencies.Scheduler = scheduler.NewBaseScheduler(i.config.Internal().SchedulerMaxWorkers(), i.config.Internal().SchedulerRetryTaskLimit())
 
 	i.dependencies.SchedulerGeneralRoutesTaskConfig = &scheduler.TaskConfig{
@@ -173,15 +172,15 @@ func (i *Initializer) initScheduler() {
 		IsWaitForPrevious:     true,
 		IsIntervalAfterFinish: true,
 	}
-	logger.Log(logger.INFO, "Initializer.initServices()", "Finish init application scheduler, successfully initialized")
+	logger.Log(logger.INFO, "Initializer.initScheduler()", "Finish init application scheduler, successfully initialized")
 }
 
-func (i *Initializer) initOrchestrators() {
-	logger.Log(logger.INFO, "Initializer.initServices()", "Start init application orchestrators")
+func (i *Initializer) initReporters() {
+	logger.Log(logger.INFO, "Initializer.initReporters()", "Start init application reporters")
 	i.dependencies.GeneralRoutesReporter = reporters.NewGeneralRoutesReporter(i.config, i.storage, i.services, &prompters.CLIReporterGeneralRoutesPrompter{})
 	i.dependencies.ShipmentCloseReporter = reporters.NewShipmentCloseReporter(i.config, i.storage, i.services, &prompters.CLIReporterShipmentClosePrompter{})
 	i.dependencies.FinanceRoutesReporter = reporters.NewFinanceRoutesReporter(i.config, i.storage, i.services, &prompters.CLIReporterFinanceRoutesPrompter{})
 	i.dependencies.FinanceDailyReporter = reporters.NewFinanceDailyReporter(i.config, i.storage, i.services, &prompters.CLIReporterFinanceDailyPrompter{})
-	logger.Log(logger.INFO, "Initializer.initServices()", "Finish init application orchestrators, successfully initialized")
+	logger.Log(logger.INFO, "Initializer.initReporters()", "Finish init application reporters, successfully initialized")
 
 }

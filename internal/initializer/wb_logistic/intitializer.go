@@ -26,7 +26,7 @@ func NewInitializer(config *config.Config, storage storage.Storage, prompter pro
 }
 
 func (i *Initializer) Init() (*wb_logistic_api.Client, *session.Session, error) {
-	logger.Log(logger.INFO, "Initializer.Init()", "Start init wb logistic")
+	logger.Log(logger.INFO, "Initializer.WBLogistic.Init()", "Start init wb logistic")
 
 	cfg := i.config.Logistic().WBClient()
 	httpClient := transport.NewBaseHTTPClientWithParams(&transport.HTTPClientParameters{
@@ -43,31 +43,31 @@ func (i *Initializer) Init() (*wb_logistic_api.Client, *session.Session, error) 
 		s, err = i.AuthSession(client)
 		if err != nil {
 			i.prompter.PromptWBLogisticAuthFailed()
-			return nil, nil, errors.Wrap(err, "Initializer.Init()", "failed to auth wb logistic session")
+			return nil, nil, errors.Wrap(err, "Initializer.WBLogistic.Init()", "failed to auth wb logistic session")
 		}
 	} else {
 		s, err = i.authSessionStorage(client)
 		if err != nil {
 			i.prompter.PromptWBLogisticAuthStorageFailed()
-			logger.Logf(logger.WARN, "Initializer.Init()", "failed to auth wb logistic session using storage: %v", err)
+			logger.Logf(logger.WARN, "Initializer.WBLogistic.Init()", "failed to auth wb logistic session using storage: %v", err)
 
 			s, err = i.AuthSession(client)
 			if err != nil {
 				i.prompter.PromptWBLogisticAuthFailed()
-				return nil, nil, errors.Wrap(err, "Initializer.Init()", "failed to auth wb logistic session")
+				return nil, nil, errors.Wrap(err, "Initializer.WBLogistic.Init()", "failed to auth wb logistic session")
 			}
 		}
 	}
 
 	i.prompter.PromptWBLogisticAuthSuccessful(s.Login(), s.UserInfo().UserDetails.Name)
 
-	logger.Log(logger.INFO, "Initializer.Init()", "Finish init wb logistic")
+	logger.Log(logger.INFO, "Initializer.WBLogistic.Init()", "Finish init wb logistic")
 	return client, s, nil
 }
 
 // InitDirect init without storage data
 func (i *Initializer) InitDirect() (*wb_logistic_api.Client, *session.Session, error) {
-	logger.Log(logger.INFO, "Initializer.InitDirect()", "Start init wb logistic")
+	logger.Log(logger.INFO, "Initializer.WBLogistic.InitDirect()", "Start init wb logistic")
 
 	cfg := i.config.Logistic().WBClient()
 	httpClient := transport.NewBaseHTTPClientWithParams(&transport.HTTPClientParameters{
@@ -81,10 +81,10 @@ func (i *Initializer) InitDirect() (*wb_logistic_api.Client, *session.Session, e
 	s, err := i.AuthSession(client)
 	if err != nil {
 		i.prompter.PromptWBLogisticAuthFailed()
-		return nil, nil, errors.Wrap(err, "Initializer.InitDirect()", "failed to auth wb logistic session")
+		return nil, nil, errors.Wrap(err, "Initializer.WBLogistic.InitDirect()", "failed to auth wb logistic session")
 	}
 	i.prompter.PromptWBLogisticAuthSuccessful(s.Login(), s.UserInfo().UserDetails.Name)
 
-	logger.Log(logger.INFO, "Initializer.InitDirect()", "Finish init wb logistic")
+	logger.Log(logger.INFO, "Initializer.WBLogistic.InitDirect()", "Finish init wb logistic")
 	return client, s, nil
 }

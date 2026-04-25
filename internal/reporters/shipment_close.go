@@ -31,17 +31,17 @@ type ShipmentCloseReporter struct {
 	rendererTG            report_renderers.ReportRenderer[[]string]
 	isRenderGS            bool
 	isRenderTG            bool
+	spreadsheetID         string
+	sheetName             string
+	sheetPosition         string
 	tgChatID              int64
 
 	officeID                int
 	suppliers               map[int]struct{} // supplier id -> struct{}
 	skipRoutes              map[int]struct{} // route id -> struct{}
+	barcodesStandard        map[int]float64  // route id -> standard
 	intervalUpdateShipments time.Duration
 	prevTimeUpdateShipments time.Time
-
-	spreadsheetID string
-	sheetName     string
-	sheetPosition string
 
 	openedShipments map[int]int // shipment id -> route id
 }
@@ -60,16 +60,16 @@ func NewShipmentCloseReporter(config *config.Config, storage storage.Storage, se
 		rendererTG:          &report_renderers.TelegramBotRenderer{Mode: report_renderers.TelegramBotRenderHTML},
 		isRenderGS:          config.Reports().ShipmentClose().IsRenderGoogleSheets(),
 		isRenderTG:          config.Reports().ShipmentClose().IsRenderTelegramBot(),
+		spreadsheetID:       config.GoogleSheets().ReportSheets().GeneralRoutes().SpreadsheetID(),
+		sheetName:           config.GoogleSheets().ReportSheets().GeneralRoutes().SheetName(),
+		sheetPosition:       "A1",
 		tgChatID:            config.Telegram().ShipmentClose().ChatID(),
 
 		officeID:                config.Logistic().Office().ID(),
 		suppliers:               config.Logistic().Office().SuppliersMap(),
 		skipRoutes:              config.Logistic().Office().SkipRoutesMap(),
+		barcodesStandard:        config.Logistic().Office().BarcodesStandard(),
 		intervalUpdateShipments: config.Reports().ShipmentClose().IntervalUpdateShipments(),
-
-		spreadsheetID: config.GoogleSheets().ReportSheets().GeneralRoutes().SpreadsheetID(),
-		sheetName:     config.GoogleSheets().ReportSheets().GeneralRoutes().SheetName(),
-		sheetPosition: "A1",
 
 		openedShipments: map[int]int{},
 	}
@@ -150,9 +150,11 @@ func (r *ShipmentCloseReporter) findOpenedShipments(ctx context.Context) error {
 			if !shipment.CloseDt.IsZero() {
 				continue
 			}
+
 			r.openedShipments[shipment.ShipmentID] = routeID
 			r.prompter.PromptShipmentOpened(routeID, shipment.ShipmentID, len(r.openedShipments))
 			logger.Logf(logger.INFO, "ShipmentCloseReporter.findOpenedShipments()", "open shipment: route %d, shipment %d. Cache size opened shipments: %d", routeID, shipment.ShipmentID, len(r.openedShipments))
+			return nil
 		}
 	}
 	return nil
@@ -162,8 +164,6 @@ func (r *ShipmentCloseReporter) processOpenedShipments(ctx context.Context) erro
 	logger.Log(logger.INFO, "ShipmentCloseReporter.processOpenedShipments()", "start process opened shipments")
 
 	for shipmentID, routeID := range r.openedShipments {
-		time.Sleep(100 * time.Millisecond)
-
 		info, err := r.loadShipmentInfo(ctx, shipmentID)
 		if err != nil {
 			r.prompter.PromptError(fmt.Sprintf("Failed loading shipment info for shipment %d", shipmentID))
@@ -189,13 +189,25 @@ func (r *ShipmentCloseReporter) processOpenedShipments(ctx context.Context) erro
 				totalTransferBarcodes += box.CountBarcodes
 			}
 
+			// Barcodes standard
+			barcodesStandard, ok := r.barcodesStandard[routeID]
+			if !ok {
+				r.prompter.PromptError(fmt.Sprintf("There is no barcode standard for route %d, shipment %d", routeID, shipmentID))
+				logger.Logf(logger.ERROR, "ShipmentCloseReporter.processOpenedShipments()", "there is no barcode standard for route %d, shipment %d", routeID, shipmentID)
+			}
+
+			var barcodesDeviationPercent float64
+			if barcodesStandard != 0 {
+				barcodesDeviationPercent = (float64(totalTransferBarcodes) - barcodesStandard) / barcodesStandard * 100
+			}
+
 			// Remains tares
-			dstOfficesIDs := make([]int, len(info.DestinationOfficesInfo))
-			for i, v := range info.DestinationOfficesInfo {
+			dstOfficesIDs := make([]int, 0, len(info.DestinationOfficesInfo))
+			for _, v := range info.DestinationOfficesInfo {
 				if v == nil {
 					continue
 				}
-				dstOfficesIDs[i] = v.DstOfficeID
+				dstOfficesIDs = append(dstOfficesIDs, v.DstOfficeID)
 			}
 
 			remainsTares, err := r.loadRemainsTares(ctx, dstOfficesIDs)
@@ -234,21 +246,23 @@ func (r *ShipmentCloseReporter) processOpenedShipments(ctx context.Context) erro
 			r.prompter.PromptShipmentClose(routeID, shipmentID)
 			logger.Logf(logger.INFO, "ShipmentCloseReporter.processOpenedShipments()", "shipment %d is closed on route %d, waysheet %d", shipmentID, routeID, info.WaySheetID)
 			err = r.sendReport(ctx, &reports.ShipmentCloseReportData{
-				RouteID:               routeID,
-				ShipmentID:            shipmentID,
-				WaySheetID:            info.WaySheetID,
-				Parking:               parking,
-				DriverName:            info.DriverName,
-				VehicleNumberPlate:    info.VehicleNumberPlate,
-				TotalRemainsBarcodes:  totalRemainsBarcodes,
-				TotalRemainsTares:     len(remainsTares),
-				TotalTransferBarcodes: totalTransferBarcodes,
-				TotalTransferTares:    len(transferBoxes),
-				Date:                  info.CreateDt,
-				DateCreate:            info.CreateDt,
-				DateClose:             info.CloseDt,
-				SpName:                spName,
-				RemainsTaresInfo:      remainsTaresInfo,
+				RouteID:                  routeID,
+				ShipmentID:               shipmentID,
+				WaySheetID:               info.WaySheetID,
+				Parking:                  parking,
+				DriverName:               info.DriverName,
+				VehicleNumberPlate:       info.VehicleNumberPlate,
+				BarcodesTotalRemains:     totalRemainsBarcodes,
+				BarcodesTotalTransfer:    totalTransferBarcodes,
+				BarcodesStandard:         barcodesStandard,
+				BarcodesDeviationPercent: barcodesDeviationPercent,
+				TareTotalRemains:         len(remainsTares),
+				TareTotalTransfer:        len(transferBoxes),
+				Date:                     info.CreateDt,
+				DateCreate:               info.CreateDt,
+				DateClose:                info.CloseDt,
+				SpName:                   spName,
+				RemainsTaresInfo:         remainsTaresInfo,
 			})
 			if err != nil {
 				r.prompter.PromptError(fmt.Sprintf("Failed send report on route %d, shipment: %d", routeID, shipmentID))
@@ -477,6 +491,7 @@ func (r *ShipmentCloseReporter) sendTelegramBot(ctx context.Context) error {
 			if !ok {
 				return errors.New("ShipmentCloseReporter.sendTelegramBot()", "failed to get message from Telegram message queue")
 			}
+
 			return r.services.TelegramBotService.SendMessage(r.tgChatID, message, "HTML")
 		})
 		if err != nil {

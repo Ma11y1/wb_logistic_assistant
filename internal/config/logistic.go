@@ -105,6 +105,8 @@ type LogisticOffice struct {
 	salaryRate            map[int]float64 // ro
 	salaryRatePercentTemp map[string]float64
 	salaryRateTemp        map[string]float64
+	barcodesStandard      map[int]float64 // ro
+	barcodesStandardTemp  map[string]float64
 	percentTax            float64 // ro
 	percentDefect         float64 // ro
 	expenses              float64 // ro
@@ -117,6 +119,7 @@ type logisticOffice struct {
 	SkipRoutes        []int              `json:"skip_routes"`
 	SalaryRatePercent map[string]float64 `json:"salary_rate_percent"`
 	SalaryRate        map[string]float64 `json:"salary_rate"`
+	BarcodesStandard  map[string]float64 `json:"barcodes_standard"`
 	PercentTax        float64            `json:"percent_tax"`
 	PercentDefect     float64            `json:"percent_defect"`
 	Expenses          float64            `json:"expenses"`
@@ -132,9 +135,10 @@ func newLogisticOffice() *LogisticOffice {
 		skipRoutesMap:     map[int]struct{}{}, // default
 		salaryRatePercent: map[int]float64{},  // default
 		salaryRate:        map[int]float64{},  // default
+		barcodesStandard:  map[int]float64{},  // default
 		percentTax:        0,                  // default
 		percentDefect:     0,                  // default
-		expenses:          0,                  //default
+		expenses:          0,                  // default
 		expensesPeriod:    0,                  // default
 	}
 }
@@ -147,10 +151,12 @@ func (l *LogisticOffice) SuppliersMap() map[int]struct{} { return l.suppliersMap
 func (l *LogisticOffice) SkipRoutes() []int               { return l.skipRoutes }
 func (l *LogisticOffice) SkipRoutesMap() map[int]struct{} { return l.skipRoutesMap }
 
-func (l *LogisticOffice) SalaryRatePercent() map[int]float64 { return l.salaryRatePercent }
 func (l *LogisticOffice) SalaryRate() map[int]float64        { return l.salaryRate }
-func (l *LogisticOffice) PercentTax() float64                { return l.percentTax }
-func (l *LogisticOffice) PercentDefect() float64             { return l.percentDefect }
+func (l *LogisticOffice) SalaryRatePercent() map[int]float64 { return l.salaryRatePercent }
+func (l *LogisticOffice) BarcodesStandard() map[int]float64  { return l.barcodesStandard }
+
+func (l *LogisticOffice) PercentTax() float64    { return l.percentTax }
+func (l *LogisticOffice) PercentDefect() float64 { return l.percentDefect }
 
 func (l *LogisticOffice) Expenses() float64   { return l.expenses }
 func (l *LogisticOffice) ExpensesPeriod() int { return l.expensesPeriod }
@@ -172,6 +178,7 @@ func (l *LogisticOffice) UnmarshalJSON(b []byte) error {
 	l.expensesPeriod = temp.ExpensesPeriod
 	l.salaryRatePercentTemp = temp.SalaryRatePercent
 	l.salaryRateTemp = temp.SalaryRate
+	l.barcodesStandardTemp = temp.BarcodesStandard
 
 	l.salaryRatePercent = map[int]float64{}
 	for routeID, salaryRate := range temp.SalaryRatePercent {
@@ -186,6 +193,14 @@ func (l *LogisticOffice) UnmarshalJSON(b []byte) error {
 			l.salaryRate[atoiSafe(routeID)] = salaryRate
 		}
 	}
+
+	l.barcodesStandard = map[int]float64{}
+	for routeID, barcode := range temp.BarcodesStandard {
+		if routeID != "" {
+			l.barcodesStandard[atoiSafe(routeID)] = barcode
+		}
+	}
+
 	return nil
 }
 func (l *LogisticOffice) MarshalJSON() ([]byte, error) {
@@ -195,6 +210,7 @@ func (l *LogisticOffice) MarshalJSON() ([]byte, error) {
 		SkipRoutes:        l.skipRoutes,
 		SalaryRatePercent: l.salaryRatePercentTemp,
 		SalaryRate:        l.salaryRateTemp,
+		BarcodesStandard:  l.barcodesStandardTemp,
 		PercentTax:        l.percentTax,
 		PercentDefect:     l.percentDefect,
 		Expenses:          l.expenses,

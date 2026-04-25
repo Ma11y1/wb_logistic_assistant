@@ -5,42 +5,44 @@ import (
 	"time"
 )
 
+const prefixCLIReporterGeneralRoutesPrompter = "[Отчет маршрутов]"
+
 type CLIReporterGeneralRoutesPrompter struct {
 }
 
 func (p *CLIReporterGeneralRoutesPrompter) PromptStart() {
-	fmt.Println("Старт обновления [отчет маршрутов]...")
+	fmt.Println(prefixCLIReporterGeneralRoutesPrompter, "Старт формирования...")
 }
 
 func (p *CLIReporterGeneralRoutesPrompter) PromptFinish(duration time.Duration) {
-	fmt.Println("[Отчет маршрутов] был обновлен. Время обновления: ", duration)
+	fmt.Println(prefixCLIReporterGeneralRoutesPrompter, "Сформирован:", duration)
 }
 
 func (p *CLIReporterGeneralRoutesPrompter) PromptUpdateRoutes(count int) {
-	fmt.Printf("[Отчет маршрутов]: обновлены маршруты %d\n", count)
+	fmt.Printf("%s Обновлены маршруты: %d\n", prefixCLIReporterGeneralRoutesPrompter, count)
 }
 
 func (p *CLIReporterGeneralRoutesPrompter) PromptUpdateRating() {
-	fmt.Println("[Отчет маршрутов]: обновлен рейтинг")
+	fmt.Println(prefixCLIReporterGeneralRoutesPrompter, "Обновлен рейтинг")
 }
 
 func (p *CLIReporterGeneralRoutesPrompter) PromptUpdateShipments() {
-	fmt.Println("[Отчет маршрутов]: обновлены отгрузки")
+	fmt.Println(prefixCLIReporterGeneralRoutesPrompter, "Обновлены отгрузки")
 }
 
 func (p *CLIReporterGeneralRoutesPrompter) PromptCloseShipment(id, remainsBarcodes int) {
-	fmt.Printf("[Отчет маршрутов]: закрыта отгрузка %d, остаток ШК: %d\n", id, remainsBarcodes)
+	fmt.Printf("%s Закрыта отгрузка: %d  Остаток ШК: %d\n", prefixCLIReporterGeneralRoutesPrompter, id, remainsBarcodes)
 }
 
 func (p *CLIReporterGeneralRoutesPrompter) PromptUpdateWaySheets() {
-	fmt.Println("[Отчет маршрутов]: обновлены путевые листы")
+	fmt.Println(prefixCLIReporterGeneralRoutesPrompter, "Обновлены путевые листы")
 }
 
-func (p *CLIReporterGeneralRoutesPrompter) PromptSendReport() {
-	fmt.Println("Отправлен [отчет маршрутов]")
+func (p *CLIReporterGeneralRoutesPrompter) PromptSendReport(target string) {
+	fmt.Println(prefixCLIReporterGeneralRoutesPrompter, "Отправлен:", target)
 }
 
 func (p *CLIReporterGeneralRoutesPrompter) PromptError(message string) {
-	fmt.Println("Ошибка составления [отчет маршрутов]:", message)
+	fmt.Println(prefixCLIReporterGeneralRoutesPrompter, "Ошибка:", message)
 
 }

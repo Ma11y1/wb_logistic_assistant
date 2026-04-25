@@ -25,7 +25,7 @@ func NewInitializer(config *config.Config, storage storage.Storage, prompter pro
 }
 
 func (i *Initializer) Init() (*tgbotapi.BotAPI, error) {
-	logger.Log(logger.INFO, "Initializer.Init()", "Start init Telegram Bot")
+	logger.Log(logger.INFO, "Initializer.TelegramBot.Init()", "Start init Telegram Bot")
 	i.prompter.PromptTelegramBotAuthStart()
 
 	var token string
@@ -34,43 +34,43 @@ func (i *Initializer) Init() (*tgbotapi.BotAPI, error) {
 		token, err = i.prompter.PromptTelegramBotRequestToken()
 		if err != nil {
 			i.prompter.PromptTelegramBotInitFailed()
-			return nil, errors.Wrap(err, "Initializer.Init()", "failed to receive telegram bot token")
+			return nil, errors.Wrap(err, "Initializer.TelegramBot.Init()", "failed to receive telegram bot token")
 		}
 	} else {
 		token, err = i.GetToken()
 		if err != nil {
 			i.prompter.PromptTelegramBotInitStorageFailed()
-			logger.Logf(logger.WARN, "Initializer.Init()", "failed to receive telegram bot token using storage: %v", err)
+			logger.Logf(logger.WARN, "Initializer.TelegramBot.Init()", "failed to receive telegram bot token using storage: %v", err)
 
 			token, err = i.prompter.PromptTelegramBotRequestToken()
 			if err != nil {
 				i.prompter.PromptTelegramBotInitFailed()
-				return nil, errors.Wrap(err, "Initializer.Init()", "failed to receive telegram bot token")
+				return nil, errors.Wrap(err, "Initializer.TelegramBot.Init()", "failed to receive telegram bot token")
 			}
 		}
 	}
 	if token == "" {
-		return nil, errors.New("Initializer.Init()", "received empty telegram bot token")
+		return nil, errors.New("Initializer.TelegramBot.Init()", "received empty telegram bot token")
 	}
 
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		i.prompter.PromptTelegramBotInitFailed()
-		return nil, errors.Wrap(err, "Initializer.Init()", "failed to init telegram bot")
+		return nil, errors.Wrap(err, "Initializer.TelegramBot.Init()", "failed to init telegram bot")
 	}
 
 	err = i.SetToken(token)
 	if err != nil {
-		return nil, errors.Wrap(err, "Initializer.Init()", "failed to save telegram bot to storage")
+		return nil, errors.Wrap(err, "Initializer.TelegramBot.Init()", "failed to save telegram bot to storage")
 	}
 
 	err = i.UpdateStorage()
 	if err != nil {
 		i.prompter.PromptTelegramBotInitFailed()
-		return nil, errors.Wrap(err, "Initializer.Init()", "failed to update storage")
+		return nil, errors.Wrap(err, "Initializer.TelegramBot.Init()", "failed to update storage")
 	}
 
 	i.prompter.PromptTelegramBotAuthSuccessful(bot.Self.UserName)
-	logger.Log(logger.INFO, "Initializer.Init()", "Finish init Telegram Bot")
+	logger.Log(logger.INFO, "Initializer.TelegramBot.Init()", "Finish init Telegram Bot")
 	return bot, nil
 }

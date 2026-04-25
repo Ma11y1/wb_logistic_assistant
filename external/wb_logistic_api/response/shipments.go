@@ -15,7 +15,7 @@ type GetShipmentsResponse struct {
 func (r *GetShipmentsResponse) UnmarshalJSON(data []byte) error {
 	var apiErr errors.APIError
 	if err := json.Unmarshal(data, &apiErr); err == nil {
-		if apiErr.Code != 0 || apiErr.Err != "" {
+		if apiErr.Code != "" || apiErr.Err != "" {
 			r.Error = &apiErr
 			return nil
 		}
@@ -42,7 +42,7 @@ type GetShipmentInfoResponse struct {
 func (r *GetShipmentInfoResponse) UnmarshalJSON(data []byte) error {
 	var apiErr errors.APIError
 	if err := json.Unmarshal(data, &apiErr); err == nil {
-		if apiErr.Code != 0 || apiErr.Err != "" {
+		if apiErr.Code != "" || apiErr.Err != "" {
 			r.Error = &apiErr
 			return nil
 		}
@@ -68,7 +68,7 @@ type GetShipmentTransfersResponse struct {
 func (r *GetShipmentTransfersResponse) UnmarshalJSON(data []byte) error {
 	var apiErr errors.APIError
 	if err := json.Unmarshal(data, &apiErr); err == nil {
-		if apiErr.Code != 0 || apiErr.Err != "" {
+		if apiErr.Code != "" || apiErr.Err != "" {
 			r.Error = &apiErr
 			return nil
 		}

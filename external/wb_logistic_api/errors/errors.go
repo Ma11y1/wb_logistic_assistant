@@ -1,6 +1,10 @@
 package errors
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+	"strconv"
+)
 
 type ErrorType string
 
@@ -25,10 +29,41 @@ func (e *AuthAPIError) Error() string {
 }
 
 type APIError struct {
-	Err  string `json:"error"`
-	Code int    `json:"code"`
+	Code    string `json:"code"`
+	Err     string `json:"error"`
+	Message string `json:"message"`
 }
 
 func (e *APIError) Error() string {
-	return fmt.Sprintf("WB logistic API error [%d]: %s ", e.Code, e.Err)
+	return fmt.Sprintf("WB logistic API error [%s]: %s %s", e.Code, e.Err, e.Message)
+}
+
+func (e *APIError) UnmarshalJSON(data []byte) error {
+	var tmp struct {
+		Err     string      `json:"error"`
+		Code    interface{} `json:"code"`
+		Message string      `json:"message"`
+	}
+
+	if err := json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+
+	e.Err = tmp.Err
+	e.Message = tmp.Message
+
+	switch v := tmp.Code.(type) {
+	case string:
+		e.Code = v
+	case int:
+		e.Code = strconv.Itoa(v)
+	case float64:
+		e.Code = strconv.Itoa(int(v))
+	case nil:
+		e.Code = ""
+	default:
+		return fmt.Errorf("unexpected type for code: %T", v)
+	}
+
+	return nil
 }

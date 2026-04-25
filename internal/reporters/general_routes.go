@@ -358,8 +358,6 @@ func (r *GeneralRoutesReporter) processWaySheets(ctx context.Context, remainsRep
 	}
 
 	for _, route := range remainsReport.Routes {
-		time.Sleep(100 * time.Millisecond)
-
 		routeData := r.routeData[route.CarID]
 		reportData := r.reportData[route.CarID]
 		if routeData == nil || reportData == nil {
@@ -787,7 +785,7 @@ func (r *GeneralRoutesReporter) sendReport(ctx context.Context, meta *reports.Ge
 				r.prompter.PromptError("Failed to send report Google Sheet")
 				logger.Logf(logger.ERROR, "GeneralRoutesReporter.sendReport()", "failed send report to Google Sheets: %v", err)
 			} else {
-				r.prompter.PromptSendReport()
+				r.prompter.PromptSendReport("Google Sheets")
 				logger.Logf(logger.INFO, "GeneralRoutesReporter.sendReport()", "send report to Google Sheets")
 			}
 		}

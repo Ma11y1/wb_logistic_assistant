@@ -7,30 +7,33 @@ import (
 )
 
 type FinanceRoutesReportData struct {
-	RouteID            int
-	ShipmentID         string
-	WaySheetID         string
-	Parking            int
-	DateOpen           time.Time
-	DriverName         string
-	VehicleNumberPlate string
-	ShippedBarcodes    int
-	ShippedTare        int
-	TotalReturnTare    int
-	CurrentReturnTare  int
-	Mileage            float64
-	IncomeMileage      float64
-	Income             float64
-	IncomeTotal        float64
-	IncomeReturn       float64
-	Fine               float64
-	SalaryRate         float64
-	ExtendedSalaryRate float64
-	Defect             float64
-	PercentDefect      float64
-	Tax                float64
-	PercentTax         float64
-	Margin             float64
+	RouteID                  int
+	ShipmentID               string
+	WaySheetID               string
+	Parking                  int
+	DateOpen                 time.Time
+	DateClose                time.Time
+	DriverName               string
+	VehicleNumberPlate       string
+	BarcodesShipped          int
+	BarcodesStandard         float64
+	BarcodesDeviationPercent float64
+	TareShipped              int
+	TotalReturnTare          int
+	CurrentReturnTare        int
+	Mileage                  float64
+	IncomeMileage            float64
+	Income                   float64
+	IncomeTotal              float64
+	IncomeReturn             float64
+	Fine                     float64
+	SalaryRate               float64
+	ExtendedSalaryRate       float64
+	Defect                   float64
+	PercentDefect            float64
+	Tax                      float64
+	PercentTax               float64
+	Margin                   float64
 }
 
 type FinanceRoutesReport struct{}
@@ -56,13 +59,15 @@ func (r *FinanceRoutesReport) Render(data *FinanceRoutesReportData) (*ReportData
 				Link: "https://logistics.wildberries.ru/external-logistics/shipments-shell/shipments/" + data.ShipmentID},
 			{Text: "Путевой лист:", Bold: true, Block: true}, {Text: data.WaySheetID,
 				Link: "https://ol.wildberries.ru/#/layout/external-waysheet/" + data.WaySheetID},
-			{Text: "Дата погрузки:", Bold: true, Block: true}, {Text: data.DateOpen.Format("02.01.2006")},
-			{Text: "Время открытия:", Bold: true, Block: true}, {Text: data.DateOpen.Format("15:04")},
+			{Text: "Открытие:", Bold: true, Block: true}, {Text: data.DateOpen.Format("02.01.2006 15:04")},
+			{Text: "Закрытие:", Bold: true, Block: true}, {Text: data.DateClose.Format("02.01.2006 15:04")},
 			{Text: "Водитель:", Bold: true, Block: true}, {Text: data.DriverName},
 			{Text: "Автомобиль:", Bold: true, Block: true}, {Text: data.VehicleNumberPlate},
-			{Text: "Отгружено ШК:", Bold: true, Block: true}, {Text: itoa(data.ShippedBarcodes)},
-			{Text: "Отгружено тар:", Bold: true, Block: true}, {Text: itoa(data.ShippedTare)},
-			{Text: "Возвраты:", Bold: true, Block: true}, {Text: fmt.Sprintf("%d/%d", data.CurrentReturnTare, data.TotalReturnTare)},
+			{Text: "ШК:", Bold: true, Block: true}, {Text: itoa(data.BarcodesShipped)},
+			{Text: "ШК норматив:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.0f", data.BarcodesStandard)},
+			{Text: "ШК отклонение:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.1f%%", data.BarcodesDeviationPercent)},
+			{Text: "Тара отгружено:", Bold: true, Block: true}, {Text: itoa(data.TareShipped)},
+			{Text: "Тара возврат:", Bold: true, Block: true}, {Text: fmt.Sprintf("%d/%d", data.CurrentReturnTare, data.TotalReturnTare)},
 			{Text: "Километраж:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.1f км", data.Mileage)},
 			{Text: "Стоимость км:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р.", data.IncomeMileage)},
 			{Text: "Задание:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р.", data.Income)},

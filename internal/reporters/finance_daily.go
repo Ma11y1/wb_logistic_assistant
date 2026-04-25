@@ -18,29 +18,32 @@ import (
 )
 
 type FinanceDailyReporterData struct {
-	DateStart          time.Time
-	DateEnd            time.Time
-	RouteID            int
-	Parking            int
-	Flights            int
-	OpenedFlights      int
-	ShippedBarcodes    int
-	Tare               int
-	ShippedTare        int
-	ReturnTare         int
-	Income             float64
-	IncomeReturn       float64
-	Fine               float64
-	TotalSalaryRate    float64
-	SalaryRate         float64
-	ExtendedSalaryRate float64
-	Defect             float64
-	PercentDefect      float64
-	Tax                float64
-	PercentTax         float64
-	Margin             float64
-	WaySheetIDs        []string
-	OpenedWaySheetIDs  []string
+	DateStart                time.Time
+	DateEnd                  time.Time
+	RouteID                  int
+	Parking                  int
+	Flights                  int
+	FlightsOpened            int
+	BarcodesStandard         float64
+	BarcodesShipped          int
+	BarcodesDeviationPercent float64
+	BarcodesAverage          float64
+	Tare                     int
+	TareShipped              int
+	TareReturned             int
+	Income                   float64
+	IncomeReturn             float64
+	Fine                     float64
+	TotalSalaryRate          float64
+	SalaryRate               float64
+	ExtendedSalaryRate       float64
+	Defect                   float64
+	PercentDefect            float64
+	Tax                      float64
+	PercentTax               float64
+	Margin                   float64
+	WaySheetIDs              []string
+	OpenedWaySheetIDs        []string
 }
 
 type FinanceDailyReporter struct {
@@ -64,6 +67,7 @@ type FinanceDailyReporter struct {
 	dayOffset               int
 	salaryRatePercent       map[int]float64 // route id -> salary rate
 	salaryRate              map[int]float64 // route id -> salary rate
+	barcodesStandard        map[int]float64 // route id -> standard
 	percentTax              float64
 	taxRate                 float64
 	percentDefect           float64
@@ -98,6 +102,7 @@ func NewFinanceDailyReporter(config *config.Config, storage storage.Storage, ser
 		skipRoutes:        config.Logistic().Office().SkipRoutesMap(),
 		salaryRatePercent: config.Logistic().Office().SalaryRatePercent(),
 		salaryRate:        config.Logistic().Office().SalaryRate(),
+		barcodesStandard:  config.Logistic().Office().BarcodesStandard(),
 		percentTax:        config.Logistic().Office().PercentTax(),
 		taxRate:           config.Logistic().Office().PercentTax() / 100,
 		percentDefect:     config.Logistic().Office().PercentDefect(),
@@ -168,9 +173,13 @@ func (r *FinanceDailyReporter) processWaySheets(ctx context.Context) error {
 
 	clear(r.data)
 
-	targetClosed := 0
-	targetOpened := 0
+	totalClosedFlights := 0
+	totalOpenedFlights := 0
 	for _, waySheet := range waySheets {
+		if ctx.Err() != nil {
+			return errors.Wrap(ctx.Err(), "FinanceDailyReporter.processWaySheets()", "task was preliminarily completed")
+		}
+
 		if waySheet == nil {
 			continue
 		}
@@ -190,7 +199,6 @@ func (r *FinanceDailyReporter) processWaySheets(ctx context.Context) error {
 			data = &FinanceDailyReporterData{DateStart: timeStart, DateEnd: timeEnd, RouteID: routeID}
 			r.data[routeID] = data
 
-			time.Sleep(200 * time.Millisecond)
 			waySheetID := atoiSafe(waySheet.WaySheetID)
 			info, err := r.loadWaySheetInfo(ctx, waySheetID)
 			if err != nil {
@@ -210,19 +218,33 @@ func (r *FinanceDailyReporter) processWaySheets(ctx context.Context) error {
 
 		if waySheet.CloseDt.IsZero() {
 			data.OpenedWaySheetIDs = append(data.OpenedWaySheetIDs, waySheet.WaySheetID)
-			data.OpenedFlights++
-			targetOpened++
+			data.FlightsOpened++
+			totalOpenedFlights++
 			continue
 		}
-		targetClosed++
+		totalClosedFlights++
 
-		data.ShippedBarcodes += atoiSafe(waySheet.CountBarcodes)
+		barcodesStandard := data.BarcodesStandard
+		if barcodesStandard == 0 {
+			if v, ok := r.barcodesStandard[routeID]; ok {
+				barcodesStandard = v
+			} else {
+				r.prompter.PromptError(fmt.Sprintf("There is no barcode standard for route %d, way sheet %s", routeID, waySheet.WaySheetID))
+				logger.Logf(logger.ERROR, "FinanceDailyReporter.processWaySheets()", "there is no barcode standard for route %d, way sheet %s", routeID, waySheet.WaySheetID)
+			}
+			data.BarcodesStandard = barcodesStandard
+		}
+		data.BarcodesShipped += atoiSafe(waySheet.CountBarcodes)
+		data.BarcodesAverage = float64(data.BarcodesShipped) / float64(totalClosedFlights)
+		if data.BarcodesStandard != 0 {
+			data.BarcodesDeviationPercent = (data.BarcodesAverage - data.BarcodesStandard) / data.BarcodesStandard * 100
+		}
 
 		tare := atoiSafe(waySheet.CountBox)
 		shippedTare := atoiSafe(waySheet.CountArrivalBox)
 		data.Tare += tare
-		data.ShippedTare += shippedTare
-		data.ReturnTare += tare - shippedTare
+		data.TareShipped += shippedTare
+		data.TareReturned += tare - shippedTare
 
 		salaryRate := data.SalaryRate
 		if salaryRate == 0 {
@@ -231,8 +253,8 @@ func (r *FinanceDailyReporter) processWaySheets(ctx context.Context) error {
 			} else if v, ok := r.salaryRatePercent[routeID]; ok {
 				salaryRate = waySheet.TotalPrice * (v / 100) // calculated if the rate is in percentages and not fixed
 			} else {
-				r.prompter.PromptError(fmt.Sprintf("There is no salary rate data for the route %d, way sheet %s", routeID, waySheet.WaySheetID))
-				logger.Logf(logger.ERROR, "FinanceDailyReporter.processWaySheets()", "there is no salary rate data for the route %d, way sheet %s", routeID, waySheet.WaySheetID)
+				r.prompter.PromptError(fmt.Sprintf("There is no salary rate for route %d, way sheet %s", routeID, waySheet.WaySheetID))
+				logger.Logf(logger.ERROR, "FinanceDailyReporter.processWaySheets()", "there is no salary rate for route %d, way sheet %s", routeID, waySheet.WaySheetID)
 			}
 			data.SalaryRate = salaryRate
 		}
@@ -254,24 +276,24 @@ func (r *FinanceDailyReporter) processWaySheets(ctx context.Context) error {
 		data.WaySheetIDs = append(data.WaySheetIDs, waySheet.WaySheetID)
 	}
 
-	r.prompter.PromptCountWaySheet(len(waySheets), targetClosed, targetOpened)
+	r.prompter.PromptCountWaySheet(len(waySheets), totalClosedFlights, totalOpenedFlights)
 
 	return nil
 }
 
 func (r *FinanceDailyReporter) processReports(ctx context.Context) error {
-	if ctx.Err() != nil {
-		return errors.Wrap(ctx.Err(), "FinanceDailyReporter.processReports()", "task was preliminarily completed")
-	}
-
 	logger.Log(logger.INFO, "FinanceDailyReporter.processReports()", "start process reports")
 
 	var dateStart, dateEnd time.Time
-	var flights, openedFlights, shippedBarcodes, shippedTare, tare, returnedTare int
+	var flights, flightsOpened, barcodesShipped, tareShipped, tare, tareReturned int
 	var income, incomeReturn, fine, salaryRate, extendedSalaryRate, tax, defect, margin float64
 	var openedWaySheets []string
 
 	for routeID, data := range r.data {
+		if ctx.Err() != nil {
+			return errors.Wrap(ctx.Err(), "FinanceDailyReporter.processReports()", "task was preliminarily completed")
+		}
+
 		if data == nil {
 			delete(r.data, routeID)
 			continue
@@ -280,11 +302,11 @@ func (r *FinanceDailyReporter) processReports(ctx context.Context) error {
 		dateStart = data.DateStart
 		dateEnd = data.DateEnd
 		flights += data.Flights
-		openedFlights += data.OpenedFlights
-		shippedBarcodes += data.ShippedBarcodes
+		flightsOpened += data.FlightsOpened
+		barcodesShipped += data.BarcodesShipped
 		tare += data.Tare
-		shippedTare += data.ShippedTare
-		returnedTare += data.ReturnTare
+		tareShipped += data.TareShipped
+		tareReturned += data.TareReturned
 		income += data.Income
 		incomeReturn += data.IncomeReturn
 		fine += data.Fine
@@ -299,27 +321,30 @@ func (r *FinanceDailyReporter) processReports(ctx context.Context) error {
 		}
 
 		renderData, err := r.renderRouteReport(&reports.FinanceDailyRouteReportData{
-			Date:               dateStart,
-			RouteID:            routeID,
-			Parking:            data.Parking,
-			Flights:            data.Flights,
-			ShippedBarcodes:    data.ShippedBarcodes,
-			Tare:               data.Tare,
-			ShippedTare:        data.ShippedTare,
-			ReturnedTare:       data.ReturnTare,
-			Income:             data.Income,
-			IncomeReturn:       data.IncomeReturn,
-			Fine:               data.Fine,
-			TotalSalaryRate:    data.TotalSalaryRate,
-			SalaryRate:         data.SalaryRate,
-			ExtendedSalaryRate: data.ExtendedSalaryRate,
-			Defect:             data.Defect,
-			PercentDefect:      data.PercentDefect,
-			Tax:                data.Tax,
-			PercentTax:         data.PercentTax,
-			Margin:             data.Margin,
-			WaySheetIDs:        data.WaySheetIDs,
-			OpenedWaySheets:    data.OpenedWaySheetIDs,
+			Date:                     dateStart,
+			RouteID:                  routeID,
+			Parking:                  data.Parking,
+			Flights:                  data.Flights,
+			BarcodesStandard:         data.BarcodesStandard,
+			BarcodesShipped:          data.BarcodesShipped,
+			BarcodesAverage:          data.BarcodesAverage,
+			BarcodesDeviationPercent: data.BarcodesDeviationPercent,
+			Tare:                     data.Tare,
+			TareShipped:              data.TareShipped,
+			TareReturned:             data.TareReturned,
+			Income:                   data.Income,
+			IncomeReturn:             data.IncomeReturn,
+			Fine:                     data.Fine,
+			TotalSalaryRate:          data.TotalSalaryRate,
+			SalaryRate:               data.SalaryRate,
+			ExtendedSalaryRate:       data.ExtendedSalaryRate,
+			Defect:                   data.Defect,
+			PercentDefect:            data.PercentDefect,
+			Tax:                      data.Tax,
+			PercentTax:               data.PercentTax,
+			Margin:                   data.Margin,
+			WaySheetIDs:              data.WaySheetIDs,
+			OpenedWaySheets:          data.OpenedWaySheetIDs,
 		})
 		if err != nil {
 			r.prompter.PromptError(fmt.Sprintf("Failed render route report, route id %d: %v", routeID, err))
@@ -344,11 +369,12 @@ func (r *FinanceDailyReporter) processReports(ctx context.Context) error {
 		DateStart:          dateStart,
 		DateEnd:            dateEnd,
 		Flights:            flights,
-		OpenedFlights:      openedFlights,
-		ShippedBarcodes:    shippedBarcodes,
-		ShippedTare:        shippedTare,
+		FlightsOpened:      flightsOpened,
+		BarcodesShipped:    barcodesShipped,
+		BarcodesAverage:    float64(barcodesShipped) / float64(flights-flightsOpened),
 		Tare:               tare,
-		ReturnedTare:       returnedTare,
+		TareShipped:        tareShipped,
+		TareReturned:       tareReturned,
 		Income:             income,
 		IncomeReturn:       incomeReturn,
 		Fine:               fine,

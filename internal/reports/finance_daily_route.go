@@ -7,27 +7,30 @@ import (
 )
 
 type FinanceDailyRouteReportData struct {
-	Date               time.Time
-	RouteID            int
-	Parking            int
-	Flights            int
-	ShippedBarcodes    int
-	Tare               int
-	ShippedTare        int
-	ReturnedTare       int
-	Income             float64
-	IncomeReturn       float64
-	Fine               float64
-	TotalSalaryRate    float64
-	SalaryRate         float64
-	ExtendedSalaryRate float64
-	Defect             float64
-	PercentDefect      float64
-	Tax                float64
-	PercentTax         float64
-	Margin             float64
-	WaySheetIDs        []string
-	OpenedWaySheets    []string
+	Date                     time.Time
+	RouteID                  int
+	Parking                  int
+	Flights                  int
+	BarcodesStandard         float64
+	BarcodesShipped          int
+	BarcodesAverage          float64
+	BarcodesDeviationPercent float64
+	Tare                     int
+	TareShipped              int
+	TareReturned             int
+	Income                   float64
+	IncomeReturn             float64
+	Fine                     float64
+	TotalSalaryRate          float64
+	SalaryRate               float64
+	ExtendedSalaryRate       float64
+	Defect                   float64
+	PercentDefect            float64
+	Tax                      float64
+	PercentTax               float64
+	Margin                   float64
+	WaySheetIDs              []string
+	OpenedWaySheets          []string
 }
 
 type FinanceDailyRouteReport struct{}
@@ -51,10 +54,13 @@ func (r *FinanceDailyRouteReport) Render(data *FinanceDailyRouteReportData) (*Re
 			{Text: "Маршрут:", Bold: true, Block: true}, {Text: itoa(data.RouteID)},
 			{Text: "Парковка:", Bold: true, Block: true}, {Text: itoa(data.Parking)},
 			{Text: "Рейсы:", Bold: true, Block: true}, {Text: itoa(data.Flights)},
-			{Text: "ШК:", Bold: true, Block: true}, {Text: itoa(data.ShippedBarcodes)},
+			{Text: "ШК:", Bold: true, Block: true}, {Text: itoa(data.BarcodesShipped)},
+			{Text: "ШК среднее:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.1f", data.BarcodesAverage)},
+			{Text: "ШК норматив:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.0f", data.BarcodesStandard)},
+			{Text: "ШК отклонение:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.1f%%", data.BarcodesDeviationPercent)},
 			{Text: "Тара:", Bold: true, Block: true}, {Text: itoa(data.Tare)},
-			{Text: "Доставлено тар:", Bold: true, Block: true}, {Text: itoa(data.ShippedTare)},
-			{Text: "Возврат тар:", Bold: true, Block: true}, {Text: itoa(data.ReturnedTare)},
+			{Text: "Тара доставлено:", Bold: true, Block: true}, {Text: itoa(data.TareShipped)},
+			{Text: "Тара возврат:", Bold: true, Block: true}, {Text: itoa(data.TareReturned)},
 			{Text: "Задание:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р.", data.Income)},
 			{Text: "Возврат:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р.", data.IncomeReturn)},
 			{Text: "Штраф:", Bold: true, Block: true}, {Text: fmt.Sprintf("%.2f р.", data.Fine)},

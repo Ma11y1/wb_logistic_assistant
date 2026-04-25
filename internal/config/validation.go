@@ -90,6 +90,9 @@ func validationReports(config *Reports) error {
 	if financeRoutes.taskTimeout <= 0 {
 		return errors.New("config.validationReports()", "'finance_routes.task_timeout' is invalid, it must be > 0")
 	}
+	if financeRoutes.renderDelay < 0 {
+		return errors.New("config.validationReports()", "'finance_routes.report_delay' is invalid, it must be >= 0")
+	}
 
 	financeDaily := config.financeDaily
 	if financeDaily == nil {

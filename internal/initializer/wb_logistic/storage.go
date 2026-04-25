@@ -17,7 +17,7 @@ func (i *Initializer) SetLoginStorage(login string) {
 func (i *Initializer) GetAccessTokenStorage() (*wb_models.AuthAccessToken, error) {
 	tokenModel := i.storage.ConfigStore().GetWBLogisticAccessToken()
 	if tokenModel == nil {
-		return nil, errors.New("Initializer.GetAccessTokenStorage()", "access token not found in storage")
+		return nil, errors.New("Initializer.WBLogistic.GetAccessTokenStorage()", "access token not found in storage")
 	}
 
 	token := &wb_models.AuthAccessToken{
@@ -28,7 +28,7 @@ func (i *Initializer) GetAccessTokenStorage() (*wb_models.AuthAccessToken, error
 	}
 
 	if err := token.Validate(); err != nil {
-		return nil, errors.Wrap(err, "Initializer.GetAccessTokenStorage()", "invalid access token")
+		return nil, errors.Wrap(err, "Initializer.WBLogistic.GetAccessTokenStorage()", "invalid access token")
 	}
 
 	return token, nil
@@ -36,11 +36,11 @@ func (i *Initializer) GetAccessTokenStorage() (*wb_models.AuthAccessToken, error
 
 func (i *Initializer) SetAccessTokenStorage(token *wb_models.AuthAccessToken) error {
 	if token == nil {
-		return errors.New("Initializer.SetAccessTokenStorage()", "access token is nil")
+		return errors.New("Initializer.WBLogistic.SetAccessTokenStorage()", "access token is nil")
 	}
 	err := token.Validate()
 	if err != nil {
-		return errors.Wrap(err, "Initializer.SetUserInfoStorage()", "invalid access token")
+		return errors.Wrap(err, "Initializer.WBLogistic.SetUserInfoStorage()", "invalid access token")
 	}
 	tokenModel := &models.WBLogisticAccessTokenModel{}
 	tokenModel.SetAll(
@@ -56,7 +56,7 @@ func (i *Initializer) SetAccessTokenStorage(token *wb_models.AuthAccessToken) er
 func (i *Initializer) GetSessionTokenStorage() (*wb_models.AuthSessionToken, error) {
 	tokenModel := i.storage.ConfigStore().GetWBLogisticSessionToken()
 	if tokenModel == nil {
-		return nil, errors.New("Initializer.GetSessionTokenStorage()", "session token not found in storage")
+		return nil, errors.New("Initializer.WBLogistic.GetSessionTokenStorage()", "session token not found in storage")
 	}
 
 	token := &wb_models.AuthSessionToken{
@@ -69,7 +69,7 @@ func (i *Initializer) GetSessionTokenStorage() (*wb_models.AuthSessionToken, err
 	}
 
 	if err := token.Validate(); err != nil {
-		return nil, errors.Wrap(err, "Initializer.GetSessionTokenStorage()", "invalid session token")
+		return nil, errors.Wrap(err, "Initializer.WBLogistic.GetSessionTokenStorage()", "invalid session token")
 	}
 
 	return token, nil
@@ -77,11 +77,11 @@ func (i *Initializer) GetSessionTokenStorage() (*wb_models.AuthSessionToken, err
 
 func (i *Initializer) SetSessionTokenStorage(token *wb_models.AuthSessionToken) error {
 	if token == nil {
-		return errors.New("Initializer.SetSessionTokenStorage()", "session token is nil")
+		return errors.New("Initializer.WBLogistic.SetSessionTokenStorage()", "session token is nil")
 	}
 	err := token.Validate()
 	if err != nil {
-		return errors.Wrap(err, "Initializer.SetUserInfoStorage()", "invalid session token")
+		return errors.Wrap(err, "Initializer.WBLogistic.SetUserInfoStorage()", "invalid session token")
 	}
 	tokenModel := &models.WBLogisticSessionTokenModel{}
 	tokenModel.SetAll(
@@ -97,7 +97,7 @@ func (i *Initializer) SetSessionTokenStorage(token *wb_models.AuthSessionToken) 
 func (i *Initializer) GetUserInfoStorage() (*wb_models.UserInfo, error) {
 	infoModel := i.storage.ConfigStore().GetWBLogisticUserInfo()
 	if infoModel == nil {
-		return nil, errors.New("Initializer.GetUserInfoStorage()", "user info not found in storage")
+		return nil, errors.New("Initializer.WBLogistic.GetUserInfoStorage()", "user info not found in storage")
 	}
 
 	roleIDs := make([]string, len(infoModel.GetRoleIDs()))
@@ -141,7 +141,7 @@ func (i *Initializer) GetUserInfoStorage() (*wb_models.UserInfo, error) {
 	}
 
 	if err := info.Validate(); err != nil {
-		return nil, errors.Wrap(err, "Initializer.GetUserInfoStorage()", "invalid user info")
+		return nil, errors.Wrap(err, "Initializer.WBLogistic.GetUserInfoStorage()", "invalid user info")
 	}
 
 	return info, nil
@@ -149,11 +149,11 @@ func (i *Initializer) GetUserInfoStorage() (*wb_models.UserInfo, error) {
 
 func (i *Initializer) SetUserInfoStorage(info *wb_models.UserInfo) error {
 	if info == nil {
-		return errors.New("Initializer.SetUserInfoStorage()", "user info is nil")
+		return errors.New("Initializer.WBLogistic.SetUserInfoStorage()", "user info is nil")
 	}
 	err := info.Validate()
 	if err != nil {
-		return errors.Wrap(err, "Initializer.SetUserInfoStorage()", "invalid user info")
+		return errors.Wrap(err, "Initializer.WBLogistic.SetUserInfoStorage()", "invalid user info")
 	}
 
 	infoModel := &models.WBLogisticUserInfoModel{}
@@ -204,7 +204,7 @@ func (i *Initializer) SetUserInfoStorage(info *wb_models.UserInfo) error {
 func (i *Initializer) UpdateStorage() error {
 	err := i.storage.Save(i.config.Storage().Path())
 	if err != nil {
-		return errors.Wrap(err, "Initializer.UpdateStorage()", "failed to update storage")
+		return errors.Wrap(err, "Initializer.WBLogistic.UpdateStorage()", "failed to update storage")
 	}
 	return nil
 }

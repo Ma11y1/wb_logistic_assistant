@@ -54,7 +54,7 @@ type GeneralRoutesReporterPrompter interface {
 	PromptUpdateRating()
 	PromptCloseShipment(id, remainsBarcodes int)
 	PromptUpdateWaySheets()
-	PromptSendReport()
+	PromptSendReport(target string)
 	PromptError(message string)
 }
 
