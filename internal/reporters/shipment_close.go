@@ -166,8 +166,8 @@ func (r *ShipmentCloseReporter) processOpenedShipments(ctx context.Context) erro
 	for shipmentID, routeID := range r.openedShipments {
 		info, err := r.loadShipmentInfo(ctx, shipmentID)
 		if err != nil {
-			r.prompter.PromptError(fmt.Sprintf("Failed loading shipment info for shipment %d", shipmentID))
 			delete(r.openedShipments, shipmentID)
+			r.prompter.PromptError(fmt.Sprintf("Failed loading shipment info for shipment %d", shipmentID))
 			logger.Logf(logger.ERROR, "ShipmentCloseReporter.processOpenedShipments()", "failed load shipment info, route %d, shipment %d: %v", routeID, shipmentID, err)
 			continue
 		}

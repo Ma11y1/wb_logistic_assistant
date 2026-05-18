@@ -116,10 +116,16 @@ func (r *FinanceRoutesReporter) findOpenedWaySheets(ctx context.Context) error {
 		if waySheet == nil {
 			continue
 		}
-		_, ok := r.openedWaySheets[waySheet.WaySheetID]
+
+		existing, ok := r.openedWaySheets[waySheet.WaySheetID]
 		if !ok && !waySheet.CloseDt.IsZero() {
 			continue
 		}
+
+		if ok && !existing.CloseDt.IsZero() {
+			continue
+		}
+
 		if r.isValidSupplier(atoiSafe(waySheet.SupplierID)) {
 			r.openedWaySheets[waySheet.WaySheetID] = waySheet
 		}

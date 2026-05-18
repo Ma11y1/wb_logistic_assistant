@@ -133,12 +133,14 @@ func (r *FinanceDailyReporter) Run(ctx context.Context) error {
 	if !r.timeLastRender.IsZero() && r.timeLastRender.Day() != now.Day() {
 		r.isRender = true
 	}
+
 	r.timeLastRender = now
 
 	if !r.isRender {
 		r.prompter.PromptFinish(time.Since(now))
 		return nil
 	}
+	r.isRender = false
 
 	err = r.processWaySheets(ctx)
 	if err != nil {
@@ -150,7 +152,6 @@ func (r *FinanceDailyReporter) Run(ctx context.Context) error {
 		return errors.Wrap(err, "FinanceDailyReporter.Run()", "failed processing reports")
 	}
 
-	r.isRender = false
 	r.prompter.PromptFinish(time.Since(now))
 	return nil
 }
@@ -166,7 +167,7 @@ func (r *FinanceDailyReporter) processWaySheets(ctx context.Context) error {
 	timeStart := time.Date(now.Year(), now.Month(), now.Day()+r.dayOffset, 0, 0, 0, 0, time.UTC)
 	timeEnd := time.Date(now.Year(), now.Month(), now.Day()+r.dayOffset, 23, 59, 59, 999999999, time.UTC)
 
-	waySheets, err := r.loadWaySheets(ctx)
+	waySheets, err := r.loadWaySheets(ctx, timeStart, timeEnd)
 	if err != nil {
 		return errors.Wrap(err, "FinanceDailyReporter.processWaySheets()", "failed process way sheets")
 	}
@@ -235,7 +236,8 @@ func (r *FinanceDailyReporter) processWaySheets(ctx context.Context) error {
 			data.BarcodesStandard = barcodesStandard
 		}
 		data.BarcodesShipped += atoiSafe(waySheet.CountBarcodes)
-		data.BarcodesAverage = float64(data.BarcodesShipped) / float64(totalClosedFlights)
+		data.BarcodesAverage = float64(data.BarcodesShipped) / float64(data.Flights-data.FlightsOpened)
+
 		if data.BarcodesStandard != 0 {
 			data.BarcodesDeviationPercent = (data.BarcodesAverage - data.BarcodesStandard) / data.BarcodesStandard * 100
 		}
@@ -450,14 +452,13 @@ func (r *FinanceDailyReporter) loadRemainsTares(ctx context.Context, dstOfficeID
 	return tares, nil
 }
 
-func (r *FinanceDailyReporter) loadWaySheets(ctx context.Context) (waySheets []*wb_models.WaySheet, err error) {
-	now := time.Now()
+func (r *FinanceDailyReporter) loadWaySheets(ctx context.Context, dOpen, dClose time.Time) (waySheets []*wb_models.WaySheet, err error) {
 	for supplierID := range r.suppliers {
 		var page *wb_models.WaySheetsPage
 		err = retryAction(ctx, "FinanceDailyReporter.loadWaySheets", 3, 1*time.Second, func() error {
 			page, err = r.services.WBLogisticService.GetWaySheets(ctx, &models.WBLogisticGetWaySheetsParamsRequest{
-				DateOpen:    time.Date(now.Year(), now.Month(), now.Day()+r.dayOffset, 0, 0, 0, 0, time.UTC),
-				DateClose:   time.Date(now.Year(), now.Month(), now.Day()+r.dayOffset, 23, 59, 59, 999999999, time.UTC),
+				DateOpen:    dOpen,
+				DateClose:   dClose,
 				SupplierID:  supplierID,
 				SrcOfficeID: r.officeID,
 				Offset:      0,
