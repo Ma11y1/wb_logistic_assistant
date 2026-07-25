@@ -101,6 +101,8 @@ type LogisticOffice struct {
 	suppliersMap          map[int]struct{}
 	skipRoutes            []int // ro
 	skipRoutesMap         map[int]struct{}
+	parkingTemp           map[string]int // ro
+	parking               map[int]int
 	salaryRatePercent     map[int]float64 // ro
 	salaryRate            map[int]float64 // ro
 	salaryRatePercentTemp map[string]float64
@@ -117,6 +119,7 @@ type logisticOffice struct {
 	ID                int                `json:"id"`
 	Suppliers         []int              `json:"suppliers"`
 	SkipRoutes        []int              `json:"skip_routes"`
+	Parking           map[string]int     `json:"parking"`
 	SalaryRatePercent map[string]float64 `json:"salary_rate_percent"`
 	SalaryRate        map[string]float64 `json:"salary_rate"`
 	BarcodesStandard  map[string]float64 `json:"barcodes_standard"`
@@ -133,6 +136,7 @@ func newLogisticOffice() *LogisticOffice {
 		suppliersMap:      map[int]struct{}{}, // default
 		skipRoutes:        []int{},            // default
 		skipRoutesMap:     map[int]struct{}{}, // default
+		parking:           map[int]int{},      // default
 		salaryRatePercent: map[int]float64{},  // default
 		salaryRate:        map[int]float64{},  // default
 		barcodesStandard:  map[int]float64{},  // default
@@ -150,6 +154,8 @@ func (l *LogisticOffice) SuppliersMap() map[int]struct{} { return l.suppliersMap
 
 func (l *LogisticOffice) SkipRoutes() []int               { return l.skipRoutes }
 func (l *LogisticOffice) SkipRoutesMap() map[int]struct{} { return l.skipRoutesMap }
+
+func (l *LogisticOffice) Parking() map[int]int { return l.parking }
 
 func (l *LogisticOffice) SalaryRate() map[int]float64        { return l.salaryRate }
 func (l *LogisticOffice) SalaryRatePercent() map[int]float64 { return l.salaryRatePercent }
@@ -180,6 +186,13 @@ func (l *LogisticOffice) UnmarshalJSON(b []byte) error {
 	l.salaryRateTemp = temp.SalaryRate
 	l.barcodesStandardTemp = temp.BarcodesStandard
 
+	l.parking = map[int]int{}
+	for parkingNew, parkingOld := range temp.Parking {
+		if parkingNew != "" {
+			l.parking[atoiSafe(parkingNew)] = parkingOld
+		}
+	}
+
 	l.salaryRatePercent = map[int]float64{}
 	for routeID, salaryRate := range temp.SalaryRatePercent {
 		if routeID != "" {
@@ -208,6 +221,7 @@ func (l *LogisticOffice) MarshalJSON() ([]byte, error) {
 		ID:                l.id,
 		Suppliers:         l.suppliers,
 		SkipRoutes:        l.skipRoutes,
+		Parking:           l.parkingTemp,
 		SalaryRatePercent: l.salaryRatePercentTemp,
 		SalaryRate:        l.salaryRateTemp,
 		BarcodesStandard:  l.barcodesStandardTemp,

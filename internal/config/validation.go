@@ -151,11 +151,17 @@ func validationLogistic(config *Logistic) error {
 	if config.office.skipRoutes == nil {
 		return errors.New("config.validationLogistic()", "'office.skip_routes' is nil")
 	}
+	if config.office.parking == nil {
+		return errors.New("config.validationLogistic()", "'office.parking' is nil")
+	}
 	if config.office.salaryRatePercent == nil {
 		return errors.New("config.validationLogistic()", "'office.salary_rate_percent' is nil")
 	}
 	if config.office.salaryRate == nil {
 		return errors.New("config.validationLogistic()", "'office.salary_rate' is nil")
+	}
+	if config.office.barcodesStandard == nil {
+		return errors.New("config.validationLogistic()", "'office.barcodes_standard' is nil")
 	}
 
 	cacheTTL := config.cacheTTL

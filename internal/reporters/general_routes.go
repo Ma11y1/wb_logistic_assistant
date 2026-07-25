@@ -19,6 +19,7 @@ import (
 type generalRoutesRouteData struct {
 	routeID            int
 	parking            int
+	parkingOld         int
 	changeBarcodes     int
 	prevBarcodes       int
 	remainsBarcodes    int
@@ -42,6 +43,7 @@ type GeneralRoutesReporter struct {
 	officeID   int
 	suppliers  map[int]struct{} // supplier id -> struct{}
 	skipRoutes map[int]struct{} // route id -> struct{}
+	parking    map[int]int      // parking new -> parking old
 
 	intervalResetChangeBarcodes time.Duration
 	intervalUpdateRating        time.Duration
@@ -83,6 +85,7 @@ func NewGeneralRoutesReporter(config *config.Config, storage storage.Storage, se
 		officeID:                    config.Logistic().Office().ID(),
 		suppliers:                   config.Logistic().Office().SuppliersMap(),
 		skipRoutes:                  config.Logistic().Office().SkipRoutesMap(),
+		parking:                     config.Logistic().Office().Parking(),
 		intervalResetChangeBarcodes: config.Reports().GeneralRoutes().IntervalResetChangeBarcodes(),
 		intervalUpdateRating:        config.Reports().GeneralRoutes().IntervalUpdateRating(),
 		intervalUpdateShipments:     config.Reports().GeneralRoutes().IntervalUpdateShipments(),
@@ -183,13 +186,14 @@ func (r *GeneralRoutesReporter) processReport(ctx context.Context, now time.Time
 
 		// First Parking and Sp name. Next updates to the parking and sp name will be when the shipment closes
 		if routeData.parking == 0 {
-			routeData.parking, err = r.loadParking(ctx, routeID)
+			routeData.parking, routeData.parkingOld, err = r.loadParking(ctx, routeID)
 			if err != nil {
 				r.prompter.PromptError(fmt.Sprintf("Failed load route info for route %d", routeID))
 				logger.Logf(logger.ERROR, "GeneralRoutesReporter.processReport()", "failed load route info for route %d: %v", routeID, err)
 			}
 		}
 		reportData.Parking = routeData.parking
+		reportData.ParkingOld = routeData.parkingOld
 
 		// Tares
 		reportData.Tares = route.CountTares
@@ -329,11 +333,12 @@ func (r *GeneralRoutesReporter) processShipment(ctx context.Context, route *wb_m
 
 	// close shipment
 	if !shipment.CloseDt.IsZero() && routeData.shipmentCloseDate.IsZero() {
-		parking, barcodes, err := r.loadParkingAndRemainsBarcodesByRouteInfo(ctx, routeInfo)
+		parking, parkingOld, barcodes, err := r.loadParkingAndRemainsBarcodesByRouteInfo(ctx, routeInfo)
 		if err != nil {
 			return errors.Wrapf(err, "GeneralRoutesReporter.processShipment()", "failed load parking and remains barcodes for shipment %d", shipment.ShipmentID)
 		}
 		routeData.parking = parking
+		routeData.parkingOld = parkingOld
 		routeData.shipmentCreateDate = shipment.CreateDt
 		routeData.shipmentCloseDate = shipment.CloseDt
 		routeData.remainsBarcodes = barcodes
@@ -653,24 +658,26 @@ func (r *GeneralRoutesReporter) loadShipments(ctx context.Context, routeID int, 
 	return shipments, nil
 }
 
-func (r *GeneralRoutesReporter) loadParking(ctx context.Context, routeID int) (int, error) {
+// loadParking returns parking NEW and parking OLD
+func (r *GeneralRoutesReporter) loadParking(ctx context.Context, routeID int) (int, int, error) {
 	routeInfo, err := r.loadRemainsLastMileReportInfo(ctx, routeID)
 	if err != nil {
-		return 0, errors.Wrapf(err, "GeneralRoutesReporter.loadParking()", "failed load route info for route %d", routeID)
+		return 0, 0, errors.Wrapf(err, "GeneralRoutesReporter.loadParking()", "failed load route info for route %d", routeID)
 	}
 
-	parking, _, err := r.loadParkingAndRemainsBarcodesByRouteInfo(ctx, routeInfo)
+	parking, parkingOld, _, err := r.loadParkingAndRemainsBarcodesByRouteInfo(ctx, routeInfo)
 	if err != nil {
-		return 0, errors.Wrapf(err, "GeneralRoutesReporter.loadParking()", "failed load parking for route %d", routeID)
+		return 0, 0, errors.Wrapf(err, "GeneralRoutesReporter.loadParking()", "failed load parking for route %d", routeID)
 
 	}
 
-	return parking, nil
+	return parking, parkingOld, nil
 }
 
-func (r *GeneralRoutesReporter) loadParkingAndRemainsBarcodesByRouteInfo(ctx context.Context, info []*wb_models.RemainsLastMileReportsRouteInfo) (int, int, error) {
+// loadParkingAndRemainsBarcodesByRouteInfo returns parking NEW, parking OLD, barcodes
+func (r *GeneralRoutesReporter) loadParkingAndRemainsBarcodesByRouteInfo(ctx context.Context, info []*wb_models.RemainsLastMileReportsRouteInfo) (int, int, int, error) {
 	if info == nil || len(info) == 0 {
-		return 0, 0, nil
+		return 0, 0, 0, nil
 	}
 	offices := make([]int, 0, len(info))
 	for _, item := range info {
@@ -682,11 +689,11 @@ func (r *GeneralRoutesReporter) loadParkingAndRemainsBarcodesByRouteInfo(ctx con
 
 	remainsTares, err := r.loadRemainsTares(ctx, offices)
 	if err != nil {
-		return 0, 0, errors.Wrapf(err, "GeneralRoutesReporter.loadParkingAndRemainsBarcodesByRouteInfo()", "failed load remains tares")
+		return 0, 0, 0, errors.Wrapf(err, "GeneralRoutesReporter.loadParkingAndRemainsBarcodesByRouteInfo()", "failed load remains tares")
 	}
 
 	if len(remainsTares) == 0 {
-		return 0, 0, nil
+		return 0, 0, 0, nil
 	}
 
 	barcodes := 0
@@ -699,7 +706,7 @@ func (r *GeneralRoutesReporter) loadParkingAndRemainsBarcodesByRouteInfo(ctx con
 
 	_, parking := SpNameToGateParking(remainsTares[0].SpName)
 
-	return parking, barcodes, nil
+	return parking, r.parking[parking], barcodes, nil
 }
 
 func (r *GeneralRoutesReporter) loadRemainsTares(ctx context.Context, dstOfficeIDs []int) (tares []*wb_models.TareForOffice, err error) {

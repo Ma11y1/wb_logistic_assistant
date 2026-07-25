@@ -117,12 +117,11 @@ func (r *FinanceRoutesReporter) findOpenedWaySheets(ctx context.Context) error {
 			continue
 		}
 
-		existing, ok := r.openedWaySheets[waySheet.WaySheetID]
-		if !ok && !waySheet.CloseDt.IsZero() {
+		_, ok := r.openedWaySheets[waySheet.WaySheetID]
+		if ok {
+			r.openedWaySheets[waySheet.WaySheetID] = waySheet
 			continue
-		}
-
-		if ok && !existing.CloseDt.IsZero() {
+		} else if !waySheet.CloseDt.IsZero() {
 			continue
 		}
 
@@ -139,6 +138,7 @@ func (r *FinanceRoutesReporter) findOpenedWaySheets(ctx context.Context) error {
 
 func (r *FinanceRoutesReporter) processOpenedWaySheets(ctx context.Context) error {
 	now := time.Now()
+
 	for id, waySheet := range r.openedWaySheets {
 		if ctx.Err() != nil {
 			return ctx.Err()

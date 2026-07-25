@@ -19,6 +19,7 @@ type GeneralRoutesReportMetaData struct {
 type GeneralRoutesReportData struct {
 	RouteID                      int
 	Parking                      int
+	ParkingOld                   int
 	Tares                        int
 	VolumeLiters                 float32
 	VolumeNormativeLiters        float32
@@ -62,6 +63,7 @@ type GeneralRoutesSheetReport struct {
 	countColumn                          int
 	columnRouteID                        int
 	columnParking                        int
+	columnParkingOld                     int
 	columnTares                          int
 	columnBarcodes                       int
 	columnChangeBarcodes                 int
@@ -93,28 +95,29 @@ func NewGeneralRoutesSheetReport(sort bool, sortColumn int, ascending bool) *Gen
 		rowHeaderTimes:  0,
 		rowHeaderNames:  1,
 
-		countColumn:                          21,
+		countColumn:                          22,
 		columnRouteID:                        0,
 		columnParking:                        1,
-		columnTares:                          2,
-		columnVolumeLiters:                   3,
-		columnVolumeNormativeLiters:          4,
-		columnBarcodes:                       5,
-		columnChangeBarcodes:                 6,
-		columnRating:                         7,
-		columnWaySheetID:                     8,
-		columnShipmentID:                     9,
-		columnWaySheetAddresses:              10,
-		columnWaySheetDateCloseAddress:       11,
-		columnShipmentCreateDate:             12,
-		columnShipmentCloseDate:              13,
-		columnWaySheetTotalReturnedTares:     14,
-		columnRemainsBarcodes:                15,
-		columnPrevWaySheetID:                 16,
-		columnPrevWaySheetAddresses:          17,
-		columnPrevWaySheetDateCloseAddress:   18,
-		columnPrevWaySheetTotalReturnedTares: 19,
-		columnWaySheetInterval:               20,
+		columnParkingOld:                     2,
+		columnTares:                          3,
+		columnVolumeLiters:                   4,
+		columnVolumeNormativeLiters:          5,
+		columnBarcodes:                       6,
+		columnChangeBarcodes:                 7,
+		columnRating:                         8,
+		columnWaySheetID:                     9,
+		columnShipmentID:                     10,
+		columnWaySheetAddresses:              11,
+		columnWaySheetDateCloseAddress:       12,
+		columnShipmentCreateDate:             13,
+		columnShipmentCloseDate:              14,
+		columnWaySheetTotalReturnedTares:     15,
+		columnRemainsBarcodes:                16,
+		columnPrevWaySheetID:                 17,
+		columnPrevWaySheetAddresses:          18,
+		columnPrevWaySheetDateCloseAddress:   19,
+		columnPrevWaySheetTotalReturnedTares: 20,
+		columnWaySheetInterval:               21,
 	}
 }
 
@@ -139,6 +142,7 @@ func (r *GeneralRoutesSheetReport) Render(meta *GeneralRoutesReportMetaData, rou
 	headerNames := report.Header.Children[r.rowHeaderNames].Children
 	headerNames[r.columnRouteID] = &Item{Text: "Маршрут"}
 	headerNames[r.columnParking] = &Item{Text: "Парковка"}
+	headerNames[r.columnParkingOld] = &Item{Text: "Парковка старая"}
 	headerNames[r.columnTares] = &Item{Text: "Тара"}
 	headerNames[r.columnVolumeLiters] = &Item{Text: "Объем, л"}
 	headerNames[r.columnVolumeNormativeLiters] = &Item{Text: "Норматив, % (л)"}
@@ -181,6 +185,17 @@ func (r *GeneralRoutesSheetReport) Render(meta *GeneralRoutesReportMetaData, rou
 				} else {
 					sort.Slice(routes, func(i, j int) bool {
 						return routes[i].Parking > routes[j].Parking
+					})
+				}
+
+			case r.columnParkingOld:
+				if r.isAscending {
+					sort.Slice(routes, func(i, j int) bool {
+						return routes[i].ParkingOld < routes[j].ParkingOld
+					})
+				} else {
+					sort.Slice(routes, func(i, j int) bool {
+						return routes[i].ParkingOld > routes[j].ParkingOld
 					})
 				}
 
@@ -416,6 +431,11 @@ func (r *GeneralRoutesSheetReport) Render(meta *GeneralRoutesReportMetaData, rou
 			row[r.columnParking] = &Item{Text: " "}
 		} else {
 			row[r.columnParking] = &Item{Text: itoa(route.Parking)}
+		}
+		if route.ParkingOld == 0 {
+			row[r.columnParkingOld] = &Item{Text: " "}
+		} else {
+			row[r.columnParkingOld] = &Item{Text: itoa(route.ParkingOld)}
 		}
 		row[r.columnTares] = &Item{Text: itoa(route.Tares)}
 		row[r.columnBarcodes] = &Item{Text: itoa(route.Barcodes)}
