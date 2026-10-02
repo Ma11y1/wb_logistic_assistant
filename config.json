@@ -24,6 +24,7 @@
       "task_timeout": 600000,
       "polling_interval": 60000,
       "interval_update_shipments": 150000,
+      "interval_remains_hours": 5,
       "render_google_sheets": false,
       "render_telegram_bot": true
     },

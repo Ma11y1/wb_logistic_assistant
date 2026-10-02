@@ -175,6 +175,7 @@ type ReportsShipmentClose struct {
 	pollingInterval         time.Duration // ro
 	taskTimeout             time.Duration // ro
 	intervalUpdateShipments time.Duration // ro
+	intervalRemainsHours    int           // ro
 	isRenderGoogleSheets    bool          // ro
 	isRenderTelegramBot     bool          // ro
 }
@@ -185,6 +186,7 @@ type reportsShipmentClose struct {
 	PollingInterval         time.Duration `json:"polling_interval"`
 	TaskTimeout             time.Duration `json:"task_timeout"`
 	IntervalUpdateShipments time.Duration `json:"interval_update_shipments"`
+	IntervalRemainsHours    int           `json:"interval_remains_hours"`
 	IsRenderGoogleSheets    bool          `json:"render_google_sheets"`
 	IsRenderTelegramBot     bool          `json:"render_telegram_bot"`
 }
@@ -196,6 +198,7 @@ func newReportsShipmentClose() *ReportsShipmentClose {
 		pollingInterval:         1000 * reportsTimePeriod,    // default
 		taskTimeout:             600_000 * reportsTimePeriod, // default
 		intervalUpdateShipments: 100_000 * reportsTimePeriod, // default
+		intervalRemainsHours:    24,                          // default
 		isRenderGoogleSheets:    false,                       // default
 		isRenderTelegramBot:     false,                       // default
 	}
@@ -213,6 +216,8 @@ func (r *ReportsShipmentClose) TaskTimeout() time.Duration { return r.taskTimeou
 
 func (r *ReportsShipmentClose) ErrRetryTaskLimit() int { return r.errRetryTaskLimit }
 
+func (r *ReportsShipmentClose) IntervalRemainsHours() int { return r.intervalRemainsHours }
+
 func (r *ReportsShipmentClose) IsRenderGoogleSheets() bool { return r.isRenderGoogleSheets }
 func (r *ReportsShipmentClose) IsRenderTelegramBot() bool  { return r.isRenderTelegramBot }
 
@@ -227,6 +232,7 @@ func (r *ReportsShipmentClose) UnmarshalJSON(b []byte) error {
 	r.intervalUpdateShipments = temp.IntervalUpdateShipments * reportsTimePeriod
 	r.errRetryTaskLimit = temp.ErrRetryTaskLimit
 	r.taskTimeout = temp.TaskTimeout * reportsTimePeriod
+	r.intervalRemainsHours = temp.IntervalRemainsHours
 	r.isRenderGoogleSheets = temp.IsRenderGoogleSheets
 	r.isRenderTelegramBot = temp.IsRenderTelegramBot
 	return nil
@@ -239,6 +245,7 @@ func (r *ReportsShipmentClose) MarshalJSON() ([]byte, error) {
 		IntervalUpdateShipments: r.intervalUpdateShipments / reportsTimePeriod,
 		ErrRetryTaskLimit:       r.errRetryTaskLimit,
 		TaskTimeout:             r.taskTimeout / reportsTimePeriod,
+		IntervalRemainsHours:    r.intervalRemainsHours,
 		IsRenderGoogleSheets:    r.isRenderGoogleSheets,
 		IsRenderTelegramBot:     r.isRenderTelegramBot,
 	})

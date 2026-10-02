@@ -12,7 +12,7 @@ import (
 	"wb_logistic_assistant/internal/logger"
 )
 
-const configPath = "config.json"
+const configPath = ".cfg"
 
 func main() {
 	defer func() {

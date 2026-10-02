@@ -40,10 +40,12 @@ type ShipmentCloseReporter struct {
 	suppliers               map[int]struct{} // supplier id -> struct{}
 	skipRoutes              map[int]struct{} // route id -> struct{}
 	barcodesStandard        map[int]float64  // route id -> standard
+	intervalRemainsHours    time.Duration
 	intervalUpdateShipments time.Duration
 	prevTimeUpdateShipments time.Time
 
 	openedShipments map[int]int // shipment id -> route id
+	lostShipments   map[int]int // shipment id -> count errors: Sometimes shipments go missing; this counter tracks the number of errors.
 }
 
 func NewShipmentCloseReporter(config *config.Config, storage storage.Storage, service *services.Container, prompter prompters.ShipmentCloseReporterPrompter) *ShipmentCloseReporter {
@@ -69,6 +71,7 @@ func NewShipmentCloseReporter(config *config.Config, storage storage.Storage, se
 		suppliers:               config.Logistic().Office().SuppliersMap(),
 		skipRoutes:              config.Logistic().Office().SkipRoutesMap(),
 		barcodesStandard:        config.Logistic().Office().BarcodesStandard(),
+		intervalRemainsHours:    time.Duration(config.Reports().ShipmentClose().IntervalRemainsHours()),
 		intervalUpdateShipments: config.Reports().ShipmentClose().IntervalUpdateShipments(),
 
 		openedShipments: map[int]int{},
@@ -154,7 +157,6 @@ func (r *ShipmentCloseReporter) findOpenedShipments(ctx context.Context) error {
 			r.openedShipments[shipment.ShipmentID] = routeID
 			r.prompter.PromptShipmentOpened(routeID, shipment.ShipmentID, len(r.openedShipments))
 			logger.Logf(logger.INFO, "ShipmentCloseReporter.findOpenedShipments()", "open shipment: route %d, shipment %d. Cache size opened shipments: %d", routeID, shipment.ShipmentID, len(r.openedShipments))
-			return nil
 		}
 	}
 	return nil
@@ -163,10 +165,16 @@ func (r *ShipmentCloseReporter) findOpenedShipments(ctx context.Context) error {
 func (r *ShipmentCloseReporter) processOpenedShipments(ctx context.Context) error {
 	logger.Log(logger.INFO, "ShipmentCloseReporter.processOpenedShipments()", "start process opened shipments")
 
+	targetTareTime := time.Now().Add(-r.intervalRemainsHours * time.Hour)
+
 	for shipmentID, routeID := range r.openedShipments {
 		info, err := r.loadShipmentInfo(ctx, shipmentID)
 		if err != nil {
-			delete(r.openedShipments, shipmentID)
+			r.lostShipments[shipmentID]++
+			if r.lostShipments[shipmentID] >= 3 {
+				delete(r.openedShipments, shipmentID)
+				delete(r.lostShipments, shipmentID)
+			}
 			r.prompter.PromptError(fmt.Sprintf("Failed loading shipment info for shipment %d", shipmentID))
 			logger.Logf(logger.ERROR, "ShipmentCloseReporter.processOpenedShipments()", "failed load shipment info, route %d, shipment %d: %v", routeID, shipmentID, err)
 			continue
@@ -217,22 +225,25 @@ func (r *ShipmentCloseReporter) processOpenedShipments(ctx context.Context) erro
 				logger.Logf(logger.ERROR, "ShipmentCloseReporter.processOpenedShipments()", "failed load remains tares, shipment %d: %v", shipmentID, err)
 			}
 
-			remainsTaresInfo := make([]*reports.ShipmentCloseRemainsTareInfo, len(remainsTares))
-			totalRemainsBarcodes := 0
-			for i, t := range remainsTares {
+			remainsTaresInfo := make([]*reports.ShipmentCloseRemainsTareInfo, 0)
+			totalRemainsBarcodes := 0 // This method of retrieving stock levels has been temporarily disabled due to bugs in the WB service.
+			for _, t := range remainsTares {
 				if t == nil {
 					logger.Logf(logger.WARN, "ShipmentCloseReporter.processOpenedShipments()", "remains tare is nil for shipment %d, total tares %d", shipmentID, len(remainsTares))
-					remainsTaresInfo[i] = &reports.ShipmentCloseRemainsTareInfo{}
 					continue
 				}
 
-				remainsTaresInfo[i] = &reports.ShipmentCloseRemainsTareInfo{
+				if t.LastOperationDt.Before(targetTareTime) {
+					continue
+				}
+
+				remainsTaresInfo = append(remainsTaresInfo, &reports.ShipmentCloseRemainsTareInfo{
 					ID:              t.ID,
 					DstOfficeID:     t.DstOfficeID,
 					DstOfficeName:   t.DstOfficeName,
 					CountBarcodes:   t.CountBarcodes,
 					LastOperationDt: t.LastOperationDt,
-				}
+				})
 				totalRemainsBarcodes += t.CountBarcodes
 			}
 
@@ -256,7 +267,7 @@ func (r *ShipmentCloseReporter) processOpenedShipments(ctx context.Context) erro
 				BarcodesTotalTransfer:    totalTransferBarcodes,
 				BarcodesStandard:         barcodesStandard,
 				BarcodesDeviationPercent: barcodesDeviationPercent,
-				TareTotalRemains:         len(remainsTares),
+				TareTotalRemains:         len(remainsTaresInfo),
 				TareTotalTransfer:        len(transferBoxes),
 				Date:                     info.CreateDt,
 				DateCreate:               info.CreateDt,
@@ -495,12 +506,12 @@ func (r *ShipmentCloseReporter) sendTelegramBot(ctx context.Context) error {
 			return r.services.TelegramBotService.SendMessage(r.tgChatID, message, "HTML")
 		})
 		if err != nil {
-			r.counterErrMessageSend++
+			//r.counterErrMessageSend++ todo возможно удалить
 			// if an error occurs in any of the messages or Telegram refuses to accept the message, it is better to reset the message queue
-			if r.counterErrMessageSend >= r.limitErrMessageSend {
-				r.messageQueueTG.Reset()
-				r.counterErrMessageSend = 0
-			}
+			//if r.counterErrMessageSend >= r.limitErrMessageSend {
+			//	r.messageQueueTG.Reset()
+			//	r.counterErrMessageSend = 0
+			//}
 			return errors.Wrapf(err, "ShipmentCloseReporter.sendTelegramBot()", "failed send data to chat %d", r.tgChatID)
 		}
 

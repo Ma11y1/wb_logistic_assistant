@@ -73,8 +73,11 @@ func validationReports(config *Reports) error {
 	if shipmentsClose.taskTimeout <= 0 {
 		return errors.New("config.validationReports()", "'shipment_close.task_timeout' is invalid, it must be > 0")
 	}
-	if shipmentsClose.intervalUpdateShipments < 0 {
+	if shipmentsClose.intervalUpdateShipments <= 0 {
 		return errors.New("config.validationReports()", "'shipment_close.interval_update_shipments' is it must be > 0")
+	}
+	if shipmentsClose.intervalRemainsHours <= 0 {
+		return errors.New("config.validationReports()", "'shipment_close.interval_remains_hours' is it must be > 0")
 	}
 
 	financeRoutes := config.financeRoutes
